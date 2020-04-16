@@ -34,10 +34,11 @@ var Main = function() { };
 Main.__name__ = true;
 Main.main = function() {
 	var sio = new require('socket.io')();
-	sio.listen(Globals.port);
+	var port = process.env["PORT"];
+	sio.listen(port == null ? Globals.port : port);
 	sio.on("connection",function(client) {
 		client.uuid = source_Util.uuid();
-		console.log("Main.hx:25:","\t socket.io:: player " + client.uuid + " connected");
+		console.log("Main.hx:28:","\t socket.io:: player " + client.uuid + " connected");
 		var room = Main.find_room(client);
 		client.emit("OnConnected",{ id : client.uuid});
 		client.on("AddEntity",function(data) {
@@ -54,7 +55,7 @@ Main.main = function() {
 		});
 		client.on("disconnect",function() {
 			room.remove_client(client.uuid);
-			console.log("Main.hx:51:","\t socket.io:: player " + client.uuid + " disconnected");
+			console.log("Main.hx:54:","\t socket.io:: player " + client.uuid + " disconnected");
 			return;
 		});
 		return;
@@ -315,6 +316,28 @@ js_Boot.__string_rec = function(o,s) {
 		return String(o);
 	}
 };
+var js_node_stream__$Writable_WritableNewOptionsAdapter_$Impl_$ = {};
+js_node_stream__$Writable_WritableNewOptionsAdapter_$Impl_$.__name__ = true;
+js_node_stream__$Writable_WritableNewOptionsAdapter_$Impl_$.from = function(options) {
+	if(!Object.prototype.hasOwnProperty.call(options,"final")) {
+		Object.defineProperty(options,"final",{ get : function() {
+			return options.final_;
+		}});
+	}
+	return options;
+};
+var js_node_url__$URLSearchParams_URLSearchParamsEntry_$Impl_$ = {};
+js_node_url__$URLSearchParams_URLSearchParamsEntry_$Impl_$.__name__ = true;
+js_node_url__$URLSearchParams_URLSearchParamsEntry_$Impl_$._new = function(name,value) {
+	var this1 = [name,value];
+	return this1;
+};
+js_node_url__$URLSearchParams_URLSearchParamsEntry_$Impl_$.get_name = function(this1) {
+	return this1[0];
+};
+js_node_url__$URLSearchParams_URLSearchParamsEntry_$Impl_$.get_value = function(this1) {
+	return this1[1];
+};
 var server_Room = function(client) {
 	this.fish_count = 0;
 	this.max_fish = 4;
@@ -445,13 +468,13 @@ server_Room.prototype = {
 		this.fish_count = 0;
 	}
 };
-var source_Game = function(server1) {
-	if(server1 == null) {
-		server1 = false;
+var source_Game = function(server) {
+	if(server == null) {
+		server = false;
 	}
 	this.bobber_speed = 400;
 	this.player_speed = 200;
-	this.server = server1;
+	this.server = server;
 	this.entities = new haxe_ds_StringMap();
 	this.start();
 };
@@ -623,8 +646,8 @@ source_Game.prototype = {
 		}
 		var entity_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(entity.x,entity.y);
 		var target_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(entity.target.x,entity.target.y);
-		var this2 = zero_utilities__$Vec2_Vec2_$Impl_$.subtract(target_pos,zero_utilities__$Vec2_Vec2_$Impl_$.from_array_float(entity_pos));
-		var distance = Math.sqrt(this2[0] * this2[0] + this2[1] * this2[1]);
+		var this1 = zero_utilities__$Vec2_Vec2_$Impl_$.subtract(target_pos,zero_utilities__$Vec2_Vec2_$Impl_$.from_array_float(entity_pos));
+		var distance = Math.sqrt(this1[0] * this1[0] + this1[1] * this1[1]);
 		if(distance < 6) {
 			entity.target = null;
 			if(entity.type == 2 && entity.state == 4 && entity.parent != null) {
@@ -651,8 +674,8 @@ source_Game.prototype = {
 							continue;
 						}
 						var bobber_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(bobber1.x,bobber1.y);
-						var this21 = zero_utilities__$Vec2_Vec2_$Impl_$.subtract(bobber_pos,zero_utilities__$Vec2_Vec2_$Impl_$.from_array_float(entity_pos));
-						if(Math.sqrt(this21[0] * this21[0] + this21[1] * this21[1]) < 40) {
+						var this2 = zero_utilities__$Vec2_Vec2_$Impl_$.subtract(bobber_pos,zero_utilities__$Vec2_Vec2_$Impl_$.from_array_float(entity_pos));
+						if(Math.sqrt(this2[0] * this2[0] + this2[1] * this2[1]) < 40) {
 							entity.state = 5;
 							entity.target = { x : bobber1.x, y : bobber1.y};
 							entity.parent = bobber1.id;
@@ -727,16 +750,16 @@ source_Game.prototype = {
 			}
 			velocity[0] = zero_utilities__$Vec2_Vec2_$Impl_$.zero(x1);
 			velocity[1] = zero_utilities__$Vec2_Vec2_$Impl_$.zero(y1);
-			var x11 = velocity[0] * v2;
-			var y11 = velocity[1] * v2;
-			if(y11 == null) {
-				y11 = 0;
+			var x2 = velocity[0] * v2;
+			var y2 = velocity[1] * v2;
+			if(y2 == null) {
+				y2 = 0;
 			}
-			if(x11 == null) {
-				x11 = 0;
+			if(x2 == null) {
+				x2 = 0;
 			}
-			velocity[0] = zero_utilities__$Vec2_Vec2_$Impl_$.zero(x11);
-			velocity[1] = zero_utilities__$Vec2_Vec2_$Impl_$.zero(y11);
+			velocity[0] = zero_utilities__$Vec2_Vec2_$Impl_$.zero(x2);
+			velocity[1] = zero_utilities__$Vec2_Vec2_$Impl_$.zero(y2);
 			entity.x += velocity[0];
 			entity.y += velocity[1];
 			entity.rotation = (Math.atan2(velocity[1],velocity[0]) * (180 / Math.PI) % 360 + 360) % 360;
