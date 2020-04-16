@@ -1,7 +1,9 @@
 package;
 
+import js.Node;
 import haxe.Timer;
 import js.node.socketio.*;
+import js.node.Process;
 import server.Room;
 
 class Main
@@ -14,7 +16,8 @@ class Main
 
     // Create the socket.io server and listen to the designated port
     var sio = new Server();
-    sio.listen(Globals.port);
+    var port = Node.process.env.get('PORT');
+    sio.listen(port == null ? Globals.port : port);
 
     // Handle a client connecting to the server
     sio.on('connection', (client:ClientSocket) -> {

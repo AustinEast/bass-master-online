@@ -1,5 +1,6 @@
 -cp ../
 -cp ../source
+-lib hxnodejs
 -lib hxsocketio
 -lib zerolib
 # -lib express
