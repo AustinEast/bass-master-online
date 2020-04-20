@@ -1,4 +1,4 @@
-package client.objects;
+package objects;
 
 class Bobber extends FlxSprite {
   

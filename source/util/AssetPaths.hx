@@ -1,4 +1,4 @@
-package client.util;
+package util;
 
 @:build(flixel.system.FlxAssets.buildFileReferences("assets/images", true)) class Images {}
 @:build(flixel.system.FlxAssets.buildFileReferences("assets/data", true)) class Data {}

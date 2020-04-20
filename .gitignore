@@ -1,5 +1,6 @@
 .DS_Store
 release/
-export/
+debug/
 node_modules/
 server/server.js
+schema/schema

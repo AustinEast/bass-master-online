@@ -1,0 +1,13 @@
+-cp ./
+-cp ../schema
+
+-lib colyseus
+-lib zerolib
+
+-D js-es=6
+
+-debug
+
+-js ../server/game.js
+
+Game

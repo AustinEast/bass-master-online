@@ -1,6 +1,6 @@
-package client.states;
+package states;
 
-import client.states.FishingState;
+import states.FishingState;
 
 class BaseState extends State
 {
