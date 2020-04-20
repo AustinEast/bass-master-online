@@ -67,7 +67,7 @@ class FishingState extends SubState
 			}
 		}
 
-		client = new Client('${Globals.url}:${Globals.port}');
+		client = new Client('fishing-alone-together.herokuapp.com'); //${Globals.url}:${Globals.port}
 		client.on(cast ClientMessage.OnConnected, (data) -> {
 			if (data.id != null) { 
 				client_id = data.id;
@@ -102,6 +102,63 @@ class FishingState extends SubState
 
 	override public function update(elapsed:Float):Void
 	{
+		input(elapsed);
+
+		super.update(elapsed);
+
+		sync();
+
+		var entity = game.entities.get(client_id);
+		if (entity != null) {
+			player_weight_text.text = entity.weight.string();
+			player_state_text.text = switch (cast entity.state : EntityState) {
+				case Idle:
+					'Idle';
+				case Aiming:
+					'Aiming';
+				case Casting:
+					'Casting';
+				case Fishing:
+					'Fishing';
+				case Reeling:
+					'Reeling';
+				case Interested:
+					'Interested';
+				case Nibbling:
+					'Nibbling';
+				case Caught:
+					'Caught';
+			}
+		}
+	}
+
+	override function destroy() {
+		super.destroy();
+
+		// untyped due to outdated externs
+		untyped client.close();
+		client = null;
+		game.dispose();
+		game = null;
+		sprites.clear();
+		sprites = null;
+	}
+
+	function sync() {
+		var point = FlxPoint.get();
+		for (key => sprite in sprites) {
+			if (sprite == null) continue;
+			var entity = game.entities.get(key);
+			if (entity != null) {
+				point.set(entity.x, entity.y);
+				sprite.set_midpoint_position(point);
+				sprite.angle = entity.rotation;
+			}
+		}
+		point.put();
+	}
+
+	function input(dt:Float) {
 		var mouse = FlxG.mouse.getWorldPosition();
 		var entity = game.entities.get(client_id);
 		var sprite = sprites.get(client_id);
@@ -109,15 +166,15 @@ class FishingState extends SubState
 		// The left mouse button is currently pressed
 		if (FlxG.mouse.pressed) {
 			if (entity != null && entity.state != null) {
-				if (entity.state == (cast EntityState.Idle) && sprite != null) {
-					var mid = sprite.getMidpoint();
-					if (!mid.equals(mouse)) {
-						entity.target = { x: mouse.x, y: mouse.y }
-						client.emit(cast ClientMessage.UpdateEntity, { id: client_id, target: { x: mouse.x, y: mouse.y } });
-					}
-					mid.put();
-				}
-				else if (entity.state == cast EntityState.Aiming) {
+				// if (entity.state == (cast EntityState.Idle) && sprite != null) {
+				// 	var mid = sprite.getMidpoint();
+				// 	if (!mid.equals(mouse)) {
+				// 		entity.target = { x: mouse.x, y: mouse.y }
+				// 		client.emit(cast ClientMessage.UpdateEntity, { id: client_id, x: entity.x, y: entity.y, rotation: entity.rotation, target: { x: mouse.x, y: mouse.y } });
+				// 	}
+				// 	mid.put();
+				// }
+				/*else*/ if (entity.state == cast EntityState.Aiming) {
 					var pos = FlxPoint.get(entity.x, entity.y);
 					var angle = mouse.get_angle_between(pos);
 					if (entity.rotation != angle)
@@ -204,57 +261,5 @@ class FishingState extends SubState
 		}
 
 		mouse.put();
-
-		super.update(elapsed);
-
-		sync();
-
-		if (entity != null) {
-			player_weight_text.text = entity.weight.string();
-			player_state_text.text = switch (cast entity.state : EntityState) {
-				case Idle:
-					'Idle';
-				case Aiming:
-					'Aiming';
-				case Casting:
-					'Casting';
-				case Fishing:
-					'Fishing';
-				case Reeling:
-					'Reeling';
-				case Interested:
-					'Interested';
-				case Nibbling:
-					'Nibbling';
-				case Caught:
-					'Caught';
-			}
-		}
-	}
-
-	override function destroy() {
-		super.destroy();
-
-		// untyped due to outdated externs
-		untyped client.close();
-		client = null;
-		game.dispose();
-		game = null;
-		sprites.clear();
-		sprites = null;
-	}
-
-	function sync() {
-		var point = FlxPoint.get();
-		for (key => sprite in sprites) {
-			if (sprite == null) continue;
-			var entity = game.entities.get(key);
-			if (entity != null) {
-				point.set(entity.x, entity.y);
-				sprite.set_midpoint_position(point);
-				sprite.angle = entity.rotation;
-			}
-		}
-		point.put();
 	}
 }

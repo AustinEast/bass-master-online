@@ -15,13 +15,15 @@ class Game {
 
   final player_speed:Float = 200;
   final bobber_speed:Float = 400;
+  final server_latency:Float = 200;
 
-  var server:Bool;
+  var client_id:String;
   var timer:Timer;
   var last_sync:Null<GameState>;
+  var last_sync_time:Float = 0;
 
-  public function new(server = false) {
-    this.server = server;
+  public function new(?client_id:String) {
+    this.client_id = client_id;
     entities = [];
 
     start();
@@ -90,10 +92,15 @@ class Game {
   }
 
   public function sync(state:GameState) {
+    last_sync = state;
+    last_sync_time = 0;
+  
     for (entity in state.entities) {
       var match = null;
+      var client = false;
       for (e in entities) {
         if (entity.id == e.id) {
+          if (client_id != null && entity.id == client_id) client = true;
           match = e;
           break;
         }
@@ -101,12 +108,14 @@ class Game {
 
       if (match == null) add_entity(entity);
       else {
-        match.x = entity.x;
-        match.y = entity.y;
-        match.rotation = entity.rotation;
+        // Dont sync these if the entity is the client
+        // if (!client) match.x = entity.x;
+        // if (!client) match.y = entity.y;
+        // if (!client) match.rotation = entity.rotation;
+        // if (!client) match.target = entity.target;
+
         match.type = entity.type;
         match.state = entity.state;
-        match.target = entity.target;
         match.weight = entity.weight;
         match.child = entity.child;
         match.parent = entity.parent;
@@ -116,25 +125,48 @@ class Game {
   }
 
   function update(dt:Float) {
+    last_sync_time += dt;
+    var interp = last_sync_time.norm(0, server_latency);
     for (entity in entities) {
       update_timers(dt, entity);
-      move_entity_towards_target(dt, entity);
+
+      // if this is the server or the client's entity, update it now
+      if (client_id == null || client_id == entity.id) {
+        move_entity_towards_target(dt, entity);
+      }
+      // otherwise interpolate it
+      else if (last_sync != null) {
+        var match = null;
+        for (e in last_sync.entities) {
+          if (entity.id == e.id) {
+            match = e;
+            break;
+          }
+        }
+
+        if (match != null) {
+          entity.x = interp.lerp(entity.x, match.x);
+          entity.y = interp.lerp(entity.y, match.y);
+          entity.rotation = interp.lerp(entity.rotation, match.rotation);
+        }
+      }
     }
+
+    if (last_sync != null && last_sync_time > server_latency) last_sync = null;
   }
 
   function update_timers(dt:Float, entity:Entity) {
     if (entity.timer != null) {
       entity.timer -= dt;
       if (entity.timer <= 0) {
+        entity.timer = null;
         if (entity.type == cast EntityType.Fish) {
-          if (entity.state == cast EntityState.Idle) {
+          if (entity.state == (cast EntityState.Idle) && client_id == null) {
             var vec2 = (Math.random() * 360).vector_from_angle(25);
             vec2.x += entity.x;
             vec2.y += entity.y;
             
             entity.target = { x: vec2.x, y: vec2.y }
-            entity.timer = null;
-
             vec2.put();
           }
           else if (entity.state == cast EntityState.Nibbling) {
