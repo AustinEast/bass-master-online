@@ -7,6 +7,7 @@
     "start": "ts-node index.ts",
     "schema": "schema-codegen ./Schema.ts --output ../schema/schema/ --haxe --namespace schema",
     "loadtest": "colyseus-loadtest loadtest/example.ts --room my_room --numClients 2",
+    "tsc": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
