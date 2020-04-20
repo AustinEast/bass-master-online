@@ -5,7 +5,6 @@ import Types;
 import zero.utilities.Vec2;
 import schema.GameState;
 import schema.Entity;
-import schema.Player;
 
 using Util;
 using Math;
