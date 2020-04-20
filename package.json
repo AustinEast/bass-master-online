@@ -5,13 +5,14 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.17.1",
-    "socketio": "^1.0.0"
+    "@colyseus/monitor": "^0.11.0",
+    "@colyseus/social": "^0.10.2",
+    "colyseus": "^0.12.0",
+    "cors": "^2.8.5",
+    "express": "^4.16.4",
+    "express-jwt": "^5.3.1"
   },
   "keywords": [],
   "author": "austineast",
-  "license": "MIT",
-  "devDependencies": {
-    "nodemon": "^2.0.3"
-  }
+  "license": "MIT"
 }
