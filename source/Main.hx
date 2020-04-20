@@ -2,7 +2,7 @@ package;
 
 import flixel.FlxGame;
 import openfl.display.Sprite;
-import client.states.BaseState;
+import states.BaseState;
 
 class Main extends Sprite
 {

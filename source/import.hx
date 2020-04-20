@@ -1,5 +1,6 @@
-import client.util.AssetPaths;
-import client.util.Reg;
+import util.AssetPaths;
+import util.Reg;
+import Types;
 
 import flixel.FlxG;
 import flixel.FlxBasic;

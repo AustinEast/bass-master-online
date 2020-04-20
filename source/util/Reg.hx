@@ -1,4 +1,4 @@
-package client.util;
+package util;
 
 class Reg 
 {

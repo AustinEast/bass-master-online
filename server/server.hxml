@@ -1,8 +1,0 @@
--cp ../
--cp ../source
--lib hxnodejs
--lib hxsocketio
--lib zerolib
-# -lib express
--main Main
--js server.js

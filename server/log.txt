@@ -1,0 +1,10 @@
+luxe / Engine / Sat Apr 18 21:49:12 2020
+luxe / Engine / path is `/Users/austin/gamedev/alone-together-2/server`
+luxe / Engine / 1.0.0-dev.82
+
+> [Error] error: cannot find requested project file `project.luxe` to build
+
+[luxe/ line 213] in run_project(_,_)
+  - from: luxe/.wren line 213
+[luxe/ line 58] in ready()
+  - from: luxe/.wren line 58

@@ -5,21 +5,21 @@
 	<app title="alone-together" file="alone-together" main="Main" version="0.0.1" company="HaxeFlixel" />
 	<app preloader="flixel.system.FlxPreloader" />
 	<set name="SWF_VERSION" value="11.8" />
-	<dependency path="server/node_modules/socket.io-client/dist/socket.io.min.js" />
 
 	<!-- ____________________________ Window Settings ___________________________ -->
 
 	<window width="640" height="480" fps="60" background="#000000" hardware="true" vsync="false" />
-	<window if="html5" resizable="false" />
+	<!-- <window if="html5" resizable="false" /> -->
 	<window if="desktop" orientation="landscape" fullscreen="false" resizable="true" />
 	<window if="mobile" orientation="landscape" fullscreen="true" width="0" height="0" />
 
 	<!-- _____________________________ Path Settings ____________________________ -->
 
-	<set name="BUILD_DIR" value="export" if='debug' />
+	<set name="BUILD_DIR" value="debug" if='debug' />
 	<set name="BUILD_DIR" value="release" unless='debug' />
 	<classpath name="source" />
-	<classpath name="client" />
+	<classpath name="game" />
+	<classpath name="schema" />
 	<assets path="assets" />
 
 	<!-- _______________________________ Libraries ______________________________ -->
@@ -28,7 +28,7 @@
 	<haxelib name="flixel-addons" />
 	<haxelib name="zerolib" />
 	<haxelib name="zerolib-flixel" />
-	<haxelib if="html5" name="hxsocketio" />
+	<haxelib name="colyseus" />
 
 	<!-- ______________________________ Haxedefines _____________________________ -->
 

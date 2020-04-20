@@ -1,4 +1,6 @@
-package source;
+package;
+
+import zero.utilities.Vec2;
 
 class Util {
   /**
@@ -15,4 +17,12 @@ class Util {
 		}
 		return uid.toString().toLowerCase();
 	}
+	
+	public static inline function in_circle(p:Vec2, c:Vec2, r:Float) {
+    return p.distance(c) < r;
+  }
+
+  public static inline function rad_between(v1:Vec2, v2:Vec2):Float {
+    return Math.atan2(v2.y - v1.y, v2.x - v1.x);
+  }
 }
