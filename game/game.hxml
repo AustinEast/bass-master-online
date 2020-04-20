@@ -6,8 +6,8 @@
 
 -D js-es=6
 
--debug
+# -debug
 
--js ../server/game.js
+-js ../game.js
 
 Game
