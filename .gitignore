@@ -3,3 +3,4 @@ release/
 debug/
 node_modules/
 server/server.js
+schema/schema
