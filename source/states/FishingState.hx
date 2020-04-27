@@ -1,5 +1,10 @@
 package states;
 
+import flixel.graphics.frames.FlxBitmapFont;
+import flixel.text.FlxBitmapText;
+import zero.flixel.states.sub.FadeIn;
+import openfl.filters.ShaderFilter;
+import util.MosaicEffect;
 import zero.utilities.Vec2;
 import objects.*;
 import schema.GameState;
@@ -21,6 +26,9 @@ class FishingState extends SubState
 
 	final render_delay:Int = 100;
 	final game_states:Array<GState> = [];
+
+	var byond:FlxBitmapFont;
+	var connecting:FlxBitmapText;
 
 	var client:Client;
 	var room:Room<GameState>;
@@ -50,9 +58,15 @@ class FishingState extends SubState
 	var last_mouse_x:Float;
 	var lerp:Float = 0.0015;
 
+	var player_score_text:FlxText;
+
 	override public function create():Void
 	{
 		super.create();
+
+		FlxG.mouse.visible = false;
+
+		openSubState(new FadeIn());
 
 		shadows = new FlxGroup();
 		sorted = new FlxTypedGroup();
@@ -80,12 +94,23 @@ class FishingState extends SubState
 		// add(players);
 		add(cursor);
 
-		camera.setSize(FlxG.width * 2, FlxG.height * 2);
-		camera.setPosition(-FlxG.width.half(), -FlxG.height.half());
 		// camera.bgColor = 0xff45283c;
 		camera.bgColor = 0xfffeb58b;
 
-		init_client();
+		byond = FlxBitmapFont.fromAngelCode(Fonts.byond__png, Fonts.byond__fnt);
+
+		connecting = new FlxBitmapText(byond);
+		connecting.text = 'connecting...';
+		connecting.scale.set(0.5,0.5);
+		connecting.screenCenter();
+
+		add(connecting);
+
+		new FlxTimer().start(1, (timer -> {
+			camera.setSize(FlxG.width * 2, FlxG.height * 2);
+			camera.setPosition(-FlxG.width.half(), -FlxG.height.half());
+			init_client();
+		}));
 	}
 
 	override public function update(elapsed:Float)
@@ -121,6 +146,8 @@ class FishingState extends SubState
 	override function destroy() {
 		super.destroy();
 
+		FlxG.mouse.visible = true;
+
 		client = null;
 		// game.dispose();
 		// game = null;
@@ -137,7 +164,19 @@ class FishingState extends SubState
 		client.joinOrCreate("game_room", [], GameState, function(err, room) {
 			if (err != null) {
 					trace("JOIN ERROR: " + err);
-					return;
+					FlxG.switchState(new BaseState());
+			}
+
+			connecting.kill();
+
+			var effect = new MosaicEffect();
+			camera.setFilters([new ShaderFilter(cast effect.shader)]);
+
+			var effect_tween = FlxTween.num(15, 1, 1, null, (v) -> {
+				effect.setStrength(v, v);
+			});
+			effect_tween.onComplete = (tween) -> {
+				camera.setFilters([]);
 			}
 
 			var world = room.state.world;
@@ -231,6 +270,10 @@ class FishingState extends SubState
 						}
 					}
 				}
+			}
+
+			room.onLeave += () -> {
+				FlxG.switchState(new BaseState());
 			}
 
 			this.room = room;
