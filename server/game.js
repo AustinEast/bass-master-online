@@ -24,8 +24,25 @@ class Game {
 						var angle = (Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0) - 180;
 						entity.rotation = angle;
 					} else {
-						entity.target_x = mouse[0];
-						entity.target_y = mouse[1];
+						entity.targets.length = 0;
+						var start = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(pos[0] / state.world.tile_width | 0,pos[1] / state.world.tile_height | 0);
+						var end = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(mouse[0] / state.world.tile_width | 0,mouse[1] / state.world.tile_height | 0);
+						var path = zero_utilities_AStar.get_path(this.map,{ start : start, end : end, passable : [1], mode : zero_utilities_EAStarMode.DIAGONAL});
+						if(path.length > 0) {
+							var _g = 0;
+							while(_g < path.length) {
+								var node = path[_g];
+								++_g;
+								var point = state.createPoint(node[0] * state.world.tile_width + state.world.tile_width * 0.5,node[1] * state.world.tile_height + state.world.tile_height * 0.5);
+								entity.targets.push(point);
+							}
+							var node1 = entity.targets.shift();
+							entity.target_x = node1.x;
+							entity.target_y = node1.y;
+						} else {
+							entity.target_x = mouse[0];
+							entity.target_y = mouse[1];
+						}
 					}
 				}
 				if(entity.state == 3 || entity.state == 2) {
@@ -50,7 +67,7 @@ class Game {
 				break;
 			case "jr":
 				if(entity.state == 1) {
-					entity.rotation = (Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0) - 180;
+					entity.rotation = Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0;
 					var bobber1 = state.createEntity(Util.uuid(),2);
 					bobber1.x = entity.x;
 					bobber1.y = entity.y;
@@ -69,7 +86,7 @@ class Game {
 				break;
 			case "p":
 				if(entity.state == 1) {
-					var angle2 = (Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0) - 180;
+					var angle2 = Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0;
 					if(entity.rotation != angle2) {
 						entity.rotation = angle2;
 					}
@@ -83,33 +100,26 @@ class Game {
 		}
 	}
 	update(dt,state) {
-		var arr = state.entityArray();
-		var _g = 0;
-		while(_g < arr.length) {
-			var entity = arr[_g];
-			++_g;
-			if(entity.timer > 0) {
+		var _gthis = this;
+		state.forEachEntity(function(entity) {
+			if(entity.timer > 0.) {
 				entity.timer -= dt;
 			}
 			var entity_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(entity.x,entity.y);
 			switch(entity.type) {
 			case 0:
 				if(entity.state == 0) {
-					this.move_entity_to_target(dt,entity);
+					_gthis.move_entity_to_target(dt,entity,state);
 				}
 				break;
 			case 1:
 				switch(entity.state) {
 				case 0:
-					if(this.move_entity_to_target(dt,entity) && entity.timer < 0) {
+					if(_gthis.move_entity_to_target(dt,entity,state) && entity.timer < 0) {
 						var found = false;
-						var arr1 = state.entityArray();
-						var _g1 = 0;
-						while(_g1 < arr1.length) {
-							var bobber = arr1[_g1];
-							++_g1;
-							if(bobber.type != 2 || bobber.child != null) {
-								continue;
+						state.forEachEntity(function(bobber) {
+							if(found || bobber.type != 2 || bobber.child != null) {
+								return;
 							}
 							var bobber_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(bobber.x,bobber.y);
 							var this1 = zero_utilities__$Vec2_Vec2_$Impl_$.subtract(bobber_pos,zero_utilities__$Vec2_Vec2_$Impl_$.from_array_float(entity_pos));
@@ -120,30 +130,33 @@ class Game {
 								entity.parent = bobber.id;
 								bobber.child = entity.id;
 								found = true;
-								zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(bobber_pos);
-								bobber_pos = null;
-								break;
 							}
 							zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(bobber_pos);
 							bobber_pos = null;
-						}
+							return;
+						});
 						if(!found) {
-							entity.target_x = entity.next_target_x;
-							entity.target_y = entity.next_target_y;
-							var a = Math.random() * 360;
-							var vec2 = zero_utilities__$Vec2_Vec2_$Impl_$.get(Math.cos(a * (Math.PI / 180)) * 25,Math.sin(a * (Math.PI / 180)) * 25);
-							vec2[0] = vec2[0] + entity.x;
-							vec2[1] = vec2[1] + entity.y;
-							entity.next_target_x = vec2[0];
-							entity.next_target_y = vec2[1];
-							zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(vec2);
-							vec2 = null;
-							entity.timer = 3 + Math.random() * 5;
+							var i_x = entity_pos[0] / state.world.tile_width | 0;
+							var i_y = entity_pos[1] / state.world.tile_height | 0;
+							zero_extensions_ArrayExt.shuffle(Util.directions);
+							var _g = 0;
+							var _g1 = Util.directions;
+							while(_g < _g1.length) {
+								var direction = _g1[_g];
+								++_g;
+								if(zero_extensions_ArrayExt.get_xy(_gthis.map,i_x + direction[0],i_y + direction[1]) == 0) {
+									entity.target_x = (i_x + direction[0]) * state.world.tile_width + state.world.tile_width * 0.5;
+									entity.target_y = (i_y + direction[1]) * state.world.tile_height + state.world.tile_height * 0.5;
+									break;
+								}
+							}
+							var tmp = Math.random() * 5;
+							entity.timer = 3 + tmp;
 						}
 					}
 					break;
 				case 1:
-					if(this.move_entity_to_target(dt,entity)) {
+					if(_gthis.move_entity_to_target(dt,entity,state)) {
 						var bobber1 = state.entities[entity.parent];
 						if(bobber1 != null) {
 							entity.timer = 1;
@@ -152,15 +165,15 @@ class Game {
 					}
 					break;
 				case 2:
-					if(this.move_entity_to_target(dt,entity) && entity.timer < 0) {
+					if(_gthis.move_entity_to_target(dt,entity,state) && entity.timer < 0) {
 						state.removeEntity(entity.id);
-						this.fish_count--;
+						_gthis.fish_count--;
 					}
 					break;
 				case 3:
-					if(this.move_entity_to_target(dt,entity)) {
+					if(_gthis.move_entity_to_target(dt,entity,state)) {
 						state.removeEntity(entity.id);
-						this.fish_count--;
+						_gthis.fish_count--;
 						var parent = state.entities[entity.parent];
 						if(parent != null) {
 							parent.weight += entity.weight;
@@ -177,12 +190,12 @@ class Game {
 					return;
 				}
 				if(entity.state == 0) {
-					if(this.move_entity_to_target(dt,entity)) {
+					if(_gthis.move_entity_to_target(dt,entity,state)) {
 						entity.state = 1;
 						parent1.state = 3;
 					}
 				} else if(entity.state == 3) {
-					if(this.move_entity_to_target(dt,entity)) {
+					if(_gthis.move_entity_to_target(dt,entity,state)) {
 						state.removeEntity(entity.id);
 						if(parent1.state == 4) {
 							parent1.state = 0;
@@ -191,35 +204,74 @@ class Game {
 				}
 				break;
 			}
-		}
+			return;
+		});
 	}
 	check_fish(state) {
 		if(this.fish_count < this.max_fish) {
+			var def_max = this.fish_positions.length - 1;
+			var max = null;
+			var pos = this.fish_positions[Math.random() * (max == null ? def_max : max) | 0];
 			this.fish_count++;
 			var fish = state.createEntity(Util.uuid(),1);
-			fish.x = Math.random() * state.world.width;
-			fish.y = Math.random() * state.world.height;
+			fish.x = pos[0];
+			fish.y = pos[1];
+			fish.rotation = Math.random() * 360;
 			fish.target_x = fish.x;
 			fish.target_y = fish.y;
 			fish.timer = 3 + Math.random() * 3;
 			fish.weight = 1 + (Math.random() * 4 | 0);
-			var a = Math.random() * 360;
-			var vec2 = zero_utilities__$Vec2_Vec2_$Impl_$.get(Math.cos(a * (Math.PI / 180)) * 25,Math.sin(a * (Math.PI / 180)) * 25);
-			vec2[0] += fish.x;
-			vec2[1] += fish.y;
-			fish.next_target_x = vec2[0];
-			fish.next_target_y = vec2[1];
-			zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(vec2);
-			vec2 = null;
 		}
 	}
-	move_entity_to_target(dt,entity) {
+	generate_map(width,height,tile_width,tile_height) {
+		this.map = Util.generate_map(width,height,tile_width,tile_height);
+		this.fish_positions = [];
+		this.player_positions = [];
+		var _g = 0;
+		var _g1 = this.map.length;
+		while(_g < _g1) {
+			var y = _g++;
+			var _g2 = 0;
+			var _g11 = this.map[y].length;
+			while(_g2 < _g11) {
+				var x = _g2++;
+				var index = zero_extensions_ArrayExt.get_xy(this.map,x,y);
+				if(index == 0 && Util.surrounding_tiles_match(this.map,index,x,y)) {
+					this.fish_positions.push(zero_utilities__$Vec2_Vec2_$Impl_$.get(x * tile_width + tile_width * 0.5,y * tile_height + tile_height * 0.5));
+				} else if(index == 1 && Util.surrounding_tiles_match(this.map,index,x,y)) {
+					this.player_positions.push(zero_utilities__$Vec2_Vec2_$Impl_$.get(x * tile_width + tile_width * 0.5,y * tile_height + tile_height * 0.5));
+				}
+			}
+		}
+		var a = this.map;
+		var _g3 = [];
+		var _g12 = 0;
+		while(_g12 < a.length) {
+			var row = a[_g12];
+			++_g12;
+			var _g13 = 0;
+			while(_g13 < row.length) {
+				var e = row[_g13];
+				++_g13;
+				_g3.push(e);
+			}
+		}
+		return _g3;
+	}
+	place_entity(entity) {
+		var def_max = this.player_positions.length - 1;
+		var max = null;
+		var pos = this.player_positions[Math.random() * (max == null ? def_max : max) | 0];
+		entity.target_x = entity.x = pos[0];
+		entity.target_y = entity.y = pos[1];
+	}
+	move_entity_to_target(dt,entity,state) {
 		if(entity == null) {
 			return false;
 		}
 		var entity_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(entity.x,entity.y);
 		var target_pos = zero_utilities__$Vec2_Vec2_$Impl_$.get(entity.target_x,entity.target_y);
-		if(entity_pos[0] == target_pos[0] && entity_pos[1] == target_pos[1]) {
+		if(entity_pos[0] == target_pos[0] && entity_pos[1] == target_pos[1] && entity.targets.length == 0) {
 			zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(entity_pos);
 			entity_pos = null;
 			zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(target_pos);
@@ -229,13 +281,20 @@ class Game {
 		var this1 = zero_utilities__$Vec2_Vec2_$Impl_$.subtract(target_pos,zero_utilities__$Vec2_Vec2_$Impl_$.from_array_float(entity_pos));
 		var distance = Math.sqrt(this1[0] * this1[0] + this1[1] * this1[1]);
 		if(distance < 4) {
-			entity.target_x = entity.x;
-			entity.target_y = entity.y;
 			zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(entity_pos);
 			entity_pos = null;
 			zero_utilities__$Vec2_Vec2_$Impl_$.pool.push(target_pos);
 			target_pos = null;
-			return true;
+			if(entity.targets.length > 0) {
+				var target = entity.targets.shift();
+				entity.target_x = target.x;
+				entity.target_y = target.y;
+				return false;
+			} else {
+				entity.target_x = entity.x;
+				entity.target_y = entity.y;
+				return true;
+			}
 		} else {
 			var velocity = zero_utilities__$Vec2_Vec2_$Impl_$.get(0,1);
 			var v = Math.atan2(target_pos[1] - entity_pos[1],target_pos[0] - entity_pos[0]);
@@ -298,75 +357,29 @@ class Game {
 }
 $hx_exports["Game"] = Game;
 Game.__name__ = true;
-Object.assign(Game.prototype, {
-	__class__: Game
-});
-class HxOverrides {
-	static remove(a,obj) {
-		var i = a.indexOf(obj);
-		if(i == -1) {
-			return false;
-		}
-		a.splice(i,1);
-		return true;
-	}
-	static iter(a) {
-		return { cur : 0, arr : a, hasNext : function() {
-			return this.cur < this.arr.length;
-		}, next : function() {
-			return this.arr[this.cur++];
-		}};
-	}
-}
-HxOverrides.__name__ = true;
-class Lambda {
-	static count(it,pred) {
-		var n = 0;
-		if(pred == null) {
-			var _ = $getIterator(it);
-			while(_.hasNext()) {
-				var _1 = _.next();
-				++n;
-			}
-		} else {
-			var x = $getIterator(it);
-			while(x.hasNext()) {
-				var x1 = x.next();
-				if(pred(x1)) {
-					++n;
-				}
-			}
-		}
-		return n;
-	}
-}
-Lambda.__name__ = true;
 Math.__name__ = true;
-class Reflect {
-	static getProperty(o,field) {
-		var tmp;
-		if(o == null) {
-			return null;
-		} else {
-			var tmp1;
-			if(o.__properties__) {
-				tmp = o.__properties__["get_" + field];
-				tmp1 = tmp;
-			} else {
-				tmp1 = false;
-			}
-			if(tmp1) {
-				return o[tmp]();
-			} else {
-				return o[field];
-			}
-		}
-	}
-}
-Reflect.__name__ = true;
 class Std {
 	static string(s) {
 		return js_Boot.__string_rec(s,"");
+	}
+	static parseInt(x) {
+		if(x != null) {
+			var _g = 0;
+			var _g1 = x.length;
+			while(_g < _g1) {
+				var i = _g++;
+				var c = x.charCodeAt(i);
+				if(c <= 8 || c >= 14 && c != 32 && c != 45) {
+					var v = parseInt(x, (x[(i + 1)]=="x" || x[(i + 1)]=="X") ? 16 : 10);
+					if(isNaN(v)) {
+						return null;
+					} else {
+						return v;
+					}
+				}
+			}
+		}
+		return null;
 	}
 }
 Std.__name__ = true;
@@ -388,12 +401,6 @@ class StringTools {
 	}
 }
 StringTools.__name__ = true;
-class Type {
-	static createInstance(cl,args) {
-		return new (Function.prototype.bind.apply(cl,[null].concat(args)));
-	}
-}
-Type.__name__ = true;
 class GState {
 	constructor(entities,time) {
 		this.entities = entities;
@@ -401,9 +408,6 @@ class GState {
 	}
 }
 GState.__name__ = true;
-Object.assign(GState.prototype, {
-	__class__: GState
-});
 class EntityState {
 	constructor(id,x,y,rotation) {
 		this.id = id;
@@ -413,9 +417,152 @@ class EntityState {
 	}
 }
 EntityState.__name__ = true;
-Object.assign(EntityState.prototype, {
-	__class__: EntityState
-});
+class zero_utilities__$IntPoint_IntPoint_$Impl_$ {
+	static from_array_int(input) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(input[0],input[1]);
+	}
+	static arr_set(this1,n,v) {
+		if(n < 0 || n > 1) {
+			return;
+		} else {
+			this1[n] = v;
+		}
+	}
+	static arr_get(this1,n) {
+		return this1[Math.floor(Math.max(Math.min(n,1),0))];
+	}
+	static get(x,y) {
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		if(zero_utilities__$IntPoint_IntPoint_$Impl_$.pool != null && zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.length > 0) {
+			var this1 = zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.shift();
+			var x1 = x;
+			var y1 = y;
+			if(y1 == null) {
+				y1 = 0;
+			}
+			if(x1 == null) {
+				x1 = 0;
+			}
+			this1[0] = x1;
+			this1[1] = y1;
+			return this1;
+		} else {
+			var x2 = x;
+			var y2 = y;
+			if(y2 == null) {
+				y2 = 0;
+			}
+			if(x2 == null) {
+				x2 = 0;
+			}
+			var this2 = [x2,y2];
+			return this2;
+		}
+	}
+	static put(this1) {
+		zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(this1);
+		this1 = null;
+	}
+	static _new(x,y) {
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		var this1 = [x,y];
+		return this1;
+	}
+	static set(this1,x,y) {
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		this1[0] = x;
+		this1[1] = y;
+		return this1;
+	}
+	static get_x(this1) {
+		return this1[0];
+	}
+	static set_x(this1,v) {
+		return this1[0] = v;
+	}
+	static get_y(this1) {
+		return this1[1];
+	}
+	static set_y(this1,v) {
+		return this1[1] = v;
+	}
+	static get_length(this1) {
+		return Math.sqrt(this1[0] * this1[0] + this1[1] * this1[1]);
+	}
+	static get_angle(this1) {
+		return (Math.atan2(this1[1],this1[0]) * (180 / Math.PI) % 360 + 360) % 360;
+	}
+	static copy_from(this1,p) {
+		var x = p[0];
+		var y = p[1];
+		if(y == null) {
+			y = 0;
+		}
+		if(x == null) {
+			x = 0;
+		}
+		this1[0] = x;
+		this1[1] = y;
+		return this1;
+	}
+	static copy(this1) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(this1[0],this1[1]);
+	}
+	static equals(this1,p) {
+		if(this1[0] == p[0]) {
+			return this1[1] == p[1];
+		} else {
+			return false;
+		}
+	}
+	static distance(this1,p) {
+		var this2 = zero_utilities__$IntPoint_IntPoint_$Impl_$.subtract(p,zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int(this1));
+		return Math.sqrt(this2[0] * this2[0] + this2[1] * this2[1]);
+	}
+	static toString(this1) {
+		return "x: " + this1[0] + " | y: " + this1[1];
+	}
+	static add(v1,v2) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v1[0] + v2[0],v1[1] + v2[1]);
+	}
+	static add_int(v,n) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v[0] + n,v[1] + n);
+	}
+	static subtract(v1,v2) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v1[0] - v2[0],v1[1] - v2[1]);
+	}
+	static subtract_int(v,n) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v[0] - n,v[1] - n);
+	}
+	static multiply(v1,v2) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v1[0] * v2[0],v1[1] * v2[1]);
+	}
+	static multiply_int(v,n) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v[0] * n,v[1] * n);
+	}
+	static mod(v1,v2) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v1[0] % v2[0],v1[1] % v2[1]);
+	}
+	static mod_int(v,n) {
+		return zero_utilities__$IntPoint_IntPoint_$Impl_$.get(v[0] % n,v[1] % n);
+	}
+}
+zero_utilities__$IntPoint_IntPoint_$Impl_$.__name__ = true;
 class Util {
 	static uuid() {
 		var uid_b = "";
@@ -431,1045 +578,159 @@ class Util {
 	static rad_between(v1,v2) {
 		return Math.atan2(v2[1] - v1[1],v2[0] - v1[0]);
 	}
-}
-Util.__name__ = true;
-class haxe_IMap {
-}
-haxe_IMap.__name__ = true;
-haxe_IMap.__isInterface__ = true;
-Object.assign(haxe_IMap.prototype, {
-	__class__: haxe_IMap
-});
-class haxe__$Int64__$_$_$Int64 {
-	constructor(high,low) {
-		this.high = high;
-		this.low = low;
-	}
-}
-haxe__$Int64__$_$_$Int64.__name__ = true;
-Object.assign(haxe__$Int64__$_$_$Int64.prototype, {
-	__class__: haxe__$Int64__$_$_$Int64
-});
-class haxe_Timer {
-}
-haxe_Timer.__name__ = true;
-class haxe_ds_IntMap {
-	constructor() {
-		this.h = { };
-	}
-	set(key,value) {
-		this.h[key] = value;
-	}
-	get(key) {
-		return this.h[key];
-	}
-	exists(key) {
-		return this.h.hasOwnProperty(key);
-	}
-	remove(key) {
-		if(!this.h.hasOwnProperty(key)) {
-			return false;
+	static set_rect(arr,x,y,width,height,index) {
+		var _g = 0;
+		var _g1 = arr.length;
+		while(_g < _g1) {
+			var row = _g++;
+			if(row >= y && row <= y + height) {
+				var _g2 = 0;
+				var _g11 = arr[row].length;
+				while(_g2 < _g11) {
+					var col = _g2++;
+					if(col >= x && col <= x + width) {
+						arr[row][col] = index;
+					}
+				}
+			}
 		}
-		delete(this.h[key]);
+	}
+	static set_circle(arr,x,y,radius,index) {
+		var _g = 0;
+		var _g1 = arr.length;
+		while(_g < _g1) {
+			var row = _g++;
+			var _g2 = 0;
+			var _g11 = arr[row].length;
+			while(_g2 < _g11) {
+				var col = _g2++;
+				if((col - x) * (col - x) + (row - y) * (row - y) <= radius * radius) {
+					arr[row][col] = index;
+				}
+			}
+		}
+	}
+	static surrounding_tiles_match(arr,index,x,y) {
+		var _g = 0;
+		var _g1 = Util.directions;
+		while(_g < _g1.length) {
+			var direction = _g1[_g];
+			++_g;
+			var tile = zero_extensions_ArrayExt.get_xy(arr,x + direction[0],y + direction[1]);
+			if(tile == null || tile != index) {
+				return false;
+			}
+		}
 		return true;
 	}
-	keys() {
-		var a = [];
-		for( var key in this.h ) (this.h.hasOwnProperty(key) ? a.push(key | 0) : null);
-		return HxOverrides.iter(a);
-	}
-	iterator() {
-		return { ref : this.h, it : this.keys(), hasNext : function() {
-			return this.it.hasNext();
-		}, next : function() {
-			var i = this.it.next();
-			return this.ref[i];
-		}};
+	static generate_map(width,height,tile_width,tile_height) {
+		var width_in_tiles = width / tile_width;
+		var height_in_tiles = height / tile_height;
+		var _g = [];
+		var _g1 = 0;
+		var _g2 = height_in_tiles | 0;
+		while(_g1 < _g2) {
+			var y = _g1++;
+			var _g11 = [];
+			var _g21 = 0;
+			var _g3 = width_in_tiles | 0;
+			while(_g21 < _g3) {
+				var x = _g21++;
+				_g11.push(1);
+			}
+			_g.push(_g11);
+		}
+		var map = _g;
+		var center = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(width_in_tiles * 0.5 | 0,height_in_tiles * 0.5 | 0);
+		var _g31 = 0;
+		while(_g31 < 6) {
+			var i = _g31++;
+			var min = 8;
+			var max = null;
+			if(min == null) {
+				min = 0;
+			}
+			var ran_r = min + Math.random() * ((max == null ? 4 : max) - min) | 0;
+			var min1 = center[0] + 6;
+			var max1 = null;
+			if(min1 == null) {
+				min1 = 0;
+			}
+			var ran_x = min1 + Math.random() * ((max1 == null ? center[0] - 6 : max1) - min1) | 0;
+			var min2 = center[1] + 6;
+			var max2 = null;
+			if(min2 == null) {
+				min2 = 0;
+			}
+			var ran_y = min2 + Math.random() * ((max2 == null ? center[1] - 6 : max2) - min2) | 0;
+			var _g4 = 0;
+			var _g12 = map.length;
+			while(_g4 < _g12) {
+				var row = _g4++;
+				var _g5 = 0;
+				var _g13 = map[row].length;
+				while(_g5 < _g13) {
+					var col = _g5++;
+					if((col - ran_x) * (col - ran_x) + (row - ran_y) * (row - ran_y) <= ran_r * ran_r) {
+						map[row][col] = 0;
+					}
+				}
+			}
+		}
+		var tree_count = 10;
+		var rock_count = 10;
+		var _g41 = 0;
+		var _g51 = tree_count;
+		while(_g41 < _g51) {
+			var i1 = _g41++;
+			var min3 = 1;
+			var max3 = null;
+			if(min3 == null) {
+				min3 = 0;
+			}
+			var x1 = min3 + Math.random() * ((max3 == null ? width_in_tiles - 1 : max3) - min3) | 0;
+			var min4 = 1;
+			var max4 = null;
+			if(min4 == null) {
+				min4 = 0;
+			}
+			var y1 = min4 + Math.random() * ((max4 == null ? height_in_tiles - 1 : max4) - min4) | 0;
+			if(zero_extensions_ArrayExt.get_xy(map,x1,y1) != 1) {
+				continue;
+			}
+			zero_extensions_ArrayExt.set_xy(map,x1,y1,2);
+		}
+		var _g6 = 0;
+		var _g7 = rock_count;
+		while(_g6 < _g7) {
+			var i2 = _g6++;
+			var min5 = 1;
+			var max5 = null;
+			if(min5 == null) {
+				min5 = 0;
+			}
+			var x2 = min5 + Math.random() * ((max5 == null ? width_in_tiles - 1 : max5) - min5) | 0;
+			var min6 = 1;
+			var max6 = null;
+			if(min6 == null) {
+				min6 = 0;
+			}
+			var y2 = min6 + Math.random() * ((max6 == null ? height_in_tiles - 1 : max6) - min6) | 0;
+			if(zero_extensions_ArrayExt.get_xy(map,x2,y2) != 1) {
+				continue;
+			}
+			zero_extensions_ArrayExt.set_xy(map,x2,y2,3);
+		}
+		return map;
 	}
 }
-haxe_ds_IntMap.__name__ = true;
-haxe_ds_IntMap.__interfaces__ = [haxe_IMap];
-Object.assign(haxe_ds_IntMap.prototype, {
-	__class__: haxe_ds_IntMap
-});
+Util.__name__ = true;
 class haxe_ds_StringMap {
 	constructor() {
 		this.h = { };
 	}
-	set(key,value) {
-		if(__map_reserved[key] != null) {
-			this.setReserved(key,value);
-		} else {
-			this.h[key] = value;
-		}
-	}
-	get(key) {
-		if(__map_reserved[key] != null) {
-			return this.getReserved(key);
-		}
-		return this.h[key];
-	}
-	exists(key) {
-		if(__map_reserved[key] != null) {
-			return this.existsReserved(key);
-		}
-		return this.h.hasOwnProperty(key);
-	}
-	setReserved(key,value) {
-		if(this.rh == null) {
-			this.rh = { };
-		}
-		this.rh["$" + key] = value;
-	}
-	getReserved(key) {
-		if(this.rh == null) {
-			return null;
-		} else {
-			return this.rh["$" + key];
-		}
-	}
-	existsReserved(key) {
-		if(this.rh == null) {
-			return false;
-		}
-		return this.rh.hasOwnProperty("$" + key);
-	}
-	remove(key) {
-		if(__map_reserved[key] != null) {
-			key = "$" + key;
-			if(this.rh == null || !this.rh.hasOwnProperty(key)) {
-				return false;
-			}
-			delete(this.rh[key]);
-			return true;
-		} else {
-			if(!this.h.hasOwnProperty(key)) {
-				return false;
-			}
-			delete(this.h[key]);
-			return true;
-		}
-	}
 }
 haxe_ds_StringMap.__name__ = true;
-haxe_ds_StringMap.__interfaces__ = [haxe_IMap];
-Object.assign(haxe_ds_StringMap.prototype, {
-	__class__: haxe_ds_StringMap
-});
-class haxe_io_Bytes {
-	constructor(data) {
-		this.length = data.byteLength;
-		this.b = new Uint8Array(data);
-		this.b.bufferValue = data;
-		data.hxBytes = this;
-		data.bytes = this.b;
-	}
-	getDouble(pos) {
-		if(this.data == null) {
-			this.data = new DataView(this.b.buffer,this.b.byteOffset,this.b.byteLength);
-		}
-		return this.data.getFloat64(pos,true);
-	}
-	getFloat(pos) {
-		if(this.data == null) {
-			this.data = new DataView(this.b.buffer,this.b.byteOffset,this.b.byteLength);
-		}
-		return this.data.getFloat32(pos,true);
-	}
-	getInt32(pos) {
-		if(this.data == null) {
-			this.data = new DataView(this.b.buffer,this.b.byteOffset,this.b.byteLength);
-		}
-		return this.data.getInt32(pos,true);
-	}
-	getInt64(pos) {
-		var this1 = new haxe__$Int64__$_$_$Int64(this.getInt32(pos + 4),this.getInt32(pos));
-		return this1;
-	}
-	getString(pos,len,encoding) {
-		if(pos < 0 || len < 0 || pos + len > this.length) {
-			throw new js__$Boot_HaxeError(haxe_io_Error.OutsideBounds);
-		}
-		if(encoding == null) {
-			encoding = haxe_io_Encoding.UTF8;
-		}
-		var s = "";
-		var b = this.b;
-		var i = pos;
-		var max = pos + len;
-		switch(encoding._hx_index) {
-		case 0:
-			var debug = pos > 0;
-			while(i < max) {
-				var c = b[i++];
-				if(c < 128) {
-					if(c == 0) {
-						break;
-					}
-					s += String.fromCodePoint(c);
-				} else if(c < 224) {
-					var code = (c & 63) << 6 | b[i++] & 127;
-					s += String.fromCodePoint(code);
-				} else if(c < 240) {
-					var c2 = b[i++];
-					var code1 = (c & 31) << 12 | (c2 & 127) << 6 | b[i++] & 127;
-					s += String.fromCodePoint(code1);
-				} else {
-					var c21 = b[i++];
-					var c3 = b[i++];
-					var u = (c & 15) << 18 | (c21 & 127) << 12 | (c3 & 127) << 6 | b[i++] & 127;
-					s += String.fromCodePoint(u);
-				}
-			}
-			break;
-		case 1:
-			while(i < max) {
-				var c1 = b[i++] | b[i++] << 8;
-				s += String.fromCodePoint(c1);
-			}
-			break;
-		}
-		return s;
-	}
-}
-haxe_io_Bytes.__name__ = true;
-Object.assign(haxe_io_Bytes.prototype, {
-	__class__: haxe_io_Bytes
-});
-var haxe_io_Encoding = $hxEnums["haxe.io.Encoding"] = { __ename__ : true, __constructs__ : ["UTF8","RawNative"]
-	,UTF8: {_hx_index:0,__enum__:"haxe.io.Encoding",toString:$estr}
-	,RawNative: {_hx_index:1,__enum__:"haxe.io.Encoding",toString:$estr}
-};
-var haxe_io_Error = $hxEnums["haxe.io.Error"] = { __ename__ : true, __constructs__ : ["Blocked","Overflow","OutsideBounds","Custom"]
-	,Blocked: {_hx_index:0,__enum__:"haxe.io.Error",toString:$estr}
-	,Overflow: {_hx_index:1,__enum__:"haxe.io.Error",toString:$estr}
-	,OutsideBounds: {_hx_index:2,__enum__:"haxe.io.Error",toString:$estr}
-	,Custom: ($_=function(e) { return {_hx_index:3,e:e,__enum__:"haxe.io.Error",toString:$estr}; },$_.__params__ = ["e"],$_)
-};
-class io_colyseus_serializer_schema_ArraySchema_$Dynamic {
-	constructor() {
-		this.items = [];
-	}
-	get_length() {
-		return this.items.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_ArraySchema_$Dynamic();
-		cloned.items = this.items.slice();
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return HxOverrides.iter(this.items);
-	}
-	toString() {
-		var data = [];
-		var _g = 0;
-		var _g1 = this.items;
-		while(_g < _g1.length) {
-			var item = _g1[_g];
-			++_g;
-			data.push("" + Std.string(item));
-		}
-		return "ArraySchema(" + Lambda.count(this.items) + ") { " + data.join(", ") + " } ";
-	}
-}
-io_colyseus_serializer_schema_ArraySchema_$Dynamic.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_ArraySchema_$Dynamic.prototype, {
-	__class__: io_colyseus_serializer_schema_ArraySchema_$Dynamic
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionField {
-	constructor() {
-		this.items = [];
-	}
-	get_length() {
-		return this.items.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionField();
-		cloned.items = this.items.slice();
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return HxOverrides.iter(this.items);
-	}
-	toString() {
-		var data = [];
-		var _g = 0;
-		var _g1 = this.items;
-		while(_g < _g1.length) {
-			var item = _g1[_g];
-			++_g;
-			data.push("" + Std.string(item));
-		}
-		return "ArraySchema(" + Lambda.count(this.items) + ") { " + data.join(", ") + " } ";
-	}
-}
-io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionField.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionField.prototype, {
-	__class__: io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionField
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionType {
-	constructor() {
-		this.items = [];
-	}
-	get_length() {
-		return this.items.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionType();
-		cloned.items = this.items.slice();
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return HxOverrides.iter(this.items);
-	}
-	toString() {
-		var data = [];
-		var _g = 0;
-		var _g1 = this.items;
-		while(_g < _g1.length) {
-			var item = _g1[_g];
-			++_g;
-			data.push("" + Std.string(item));
-		}
-		return "ArraySchema(" + Lambda.count(this.items) + ") { " + data.join(", ") + " } ";
-	}
-}
-io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionType.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionType.prototype, {
-	__class__: io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionType
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_MapSchema_$Dynamic {
-	constructor() {
-		this.items = new io_colyseus_serializer_schema_OrderedMap(new haxe_ds_StringMap());
-	}
-	get_length() {
-		return this.items._keys.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_MapSchema_$Dynamic();
-		var key = HxOverrides.iter(this.items._keys);
-		while(key.hasNext()) {
-			var key1 = key.next();
-			cloned.items.set(key1,this.items.get(key1));
-		}
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return this.items.iterator();
-	}
-	get(key) {
-		return this.items.get(key);
-	}
-	arrayWrite(key,value) {
-		this.items.set(key,value);
-		return value;
-	}
-	toString() {
-		var data = [];
-		var key = HxOverrides.iter(this.items._keys);
-		while(key.hasNext()) {
-			var key1 = key.next();
-			data.push(key1 + " => " + Std.string(this.items.get(key1)));
-		}
-		return "MapSchema (" + Lambda.count(this.items) + ") { " + data.join(", ") + " }";
-	}
-}
-io_colyseus_serializer_schema_MapSchema_$Dynamic.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_MapSchema_$Dynamic.prototype, {
-	__class__: io_colyseus_serializer_schema_MapSchema_$Dynamic
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_MapSchema_$schema_$Entity {
-	constructor() {
-		this.items = new io_colyseus_serializer_schema_OrderedMap(new haxe_ds_StringMap());
-	}
-	get_length() {
-		return this.items._keys.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_MapSchema_$schema_$Entity();
-		var key = HxOverrides.iter(this.items._keys);
-		while(key.hasNext()) {
-			var key1 = key.next();
-			cloned.items.set(key1,this.items.get(key1));
-		}
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return this.items.iterator();
-	}
-	get(key) {
-		return this.items.get(key);
-	}
-	arrayWrite(key,value) {
-		this.items.set(key,value);
-		return value;
-	}
-	toString() {
-		var data = [];
-		var key = HxOverrides.iter(this.items._keys);
-		while(key.hasNext()) {
-			var key1 = key.next();
-			data.push(key1 + " => " + Std.string(this.items.get(key1)));
-		}
-		return "MapSchema (" + Lambda.count(this.items) + ") { " + data.join(", ") + " }";
-	}
-}
-io_colyseus_serializer_schema_MapSchema_$schema_$Entity.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_MapSchema_$schema_$Entity.prototype, {
-	__class__: io_colyseus_serializer_schema_MapSchema_$schema_$Entity
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_Decorator {
-}
-io_colyseus_serializer_schema_Decorator.__name__ = true;
-class io_colyseus_serializer_schema_SPEC {
-	static numberCheck(bytes,it) {
-		var prefix = bytes.b[it.offset];
-		if(prefix >= 128) {
-			if(prefix >= 202) {
-				return prefix <= 211;
-			} else {
-				return false;
-			}
-		} else {
-			return true;
-		}
-	}
-	static arrayCheck(bytes,it) {
-		return bytes.b[it.offset] < 160;
-	}
-	static nilCheck(bytes,it) {
-		return bytes.b[it.offset] == io_colyseus_serializer_schema_SPEC.NIL;
-	}
-	static indexChangeCheck(bytes,it) {
-		return bytes.b[it.offset] == io_colyseus_serializer_schema_SPEC.INDEX_CHANGE;
-	}
-	static stringCheck(bytes,it) {
-		var prefix = bytes.get(it.offset);
-		if(!(prefix < 192 && prefix > 160 || prefix == 217 || prefix == 218)) {
-			return prefix == 219;
-		} else {
-			return true;
-		}
-	}
-}
-io_colyseus_serializer_schema_SPEC.__name__ = true;
-class io_colyseus_serializer_schema_Decoder {
-	constructor() {
-	}
-	decodePrimitiveType(type,bytes,it) {
-		switch(type) {
-		case "boolean":
-			return this.boolean(bytes,it);
-		case "float32":
-			return this.float32(bytes,it);
-		case "float64":
-			return this.float64(bytes,it);
-		case "int16":
-			return this.int16(bytes,it);
-		case "int32":
-			return this.int32(bytes,it);
-		case "int64":
-			return this.int64(bytes,it);
-		case "int8":
-			return this.int8(bytes,it);
-		case "number":
-			return this.number(bytes,it);
-		case "string":
-			return this.string(bytes,it);
-		case "uint16":
-			return this.uint16(bytes,it);
-		case "uint32":
-			return this.uint32(bytes,it);
-		case "uint64":
-			return this.uint64(bytes,it);
-		case "uint8":
-			return this.uint8(bytes,it);
-		default:
-			throw new js__$Boot_HaxeError("can't decode: " + type);
-		}
-	}
-	string(bytes,it) {
-		var prefix = bytes.b[it.offset++];
-		var length = 0;
-		if(prefix < 192) {
-			length = prefix & 31;
-		} else if(prefix == 217) {
-			length = this.uint8(bytes,it);
-		} else if(prefix == 218) {
-			length = this.uint16(bytes,it);
-		} else if(prefix == 219) {
-			length = this.uint32(bytes,it);
-		}
-		var value = bytes.getString(it.offset,length);
-		it.offset += length;
-		return value;
-	}
-	number(bytes,it) {
-		var prefix = bytes.b[it.offset++];
-		if(prefix < 128) {
-			return prefix;
-		} else if(prefix == 202) {
-			return this.float32(bytes,it);
-		} else if(prefix == 203) {
-			return this.float64(bytes,it);
-		} else if(prefix == 204) {
-			return this.uint8(bytes,it);
-		} else if(prefix == 205) {
-			return this.uint16(bytes,it);
-		} else if(prefix == 206) {
-			return this.uint32(bytes,it);
-		} else if(prefix == 207) {
-			return this.uint64(bytes,it);
-		} else if(prefix == 208) {
-			return this.int8(bytes,it);
-		} else if(prefix == 209) {
-			return this.int16(bytes,it);
-		} else if(prefix == 210) {
-			return this.int32(bytes,it);
-		} else if(prefix == 211) {
-			return this.int64(bytes,it);
-		} else if(prefix > 223) {
-			return (255 - prefix + 1) * -1;
-		}
-		return 0;
-	}
-	boolean(bytes,it) {
-		return this.uint8(bytes,it) > 0;
-	}
-	int8(bytes,it) {
-		return this.uint8(bytes,it) << 24 >> 24;
-	}
-	uint8(bytes,it) {
-		return bytes.b[it.offset++];
-	}
-	int16(bytes,it) {
-		return this.uint16(bytes,it) << 16 >> 16;
-	}
-	uint16(bytes,it) {
-		return bytes.b[it.offset++] | bytes.b[it.offset++] << 8;
-	}
-	int32(bytes,it) {
-		var value = bytes.getInt32(it.offset);
-		it.offset += 4;
-		return value;
-	}
-	uint32(bytes,it) {
-		return this.int32(bytes,it) >>> 0;
-	}
-	int64(bytes,it) {
-		var value = bytes.getInt64(it.offset);
-		it.offset += 8;
-		return value;
-	}
-	uint64(bytes,it) {
-		var low = this.uint32(bytes,it);
-		var high = this.uint32(bytes,it) * Math.pow(2,32);
-		var this1 = new haxe__$Int64__$_$_$Int64(high,low);
-		return this1;
-	}
-	float32(bytes,it) {
-		var value = bytes.getFloat(it.offset);
-		it.offset += 4;
-		return value;
-	}
-	float64(bytes,it) {
-		var value = bytes.getDouble(it.offset);
-		it.offset += 8;
-		return value;
-	}
-}
-io_colyseus_serializer_schema_Decoder.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_Decoder.prototype, {
-	__class__: io_colyseus_serializer_schema_Decoder
-});
-class io_colyseus_serializer_schema_ArraySchema {
-	constructor() {
-		this.items = [];
-	}
-	get_length() {
-		return this.items.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_ArraySchema();
-		cloned.items = this.items.slice();
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return HxOverrides.iter(this.items);
-	}
-	toString() {
-		var data = [];
-		var _g = 0;
-		var _g1 = this.items;
-		while(_g < _g1.length) {
-			var item = _g1[_g];
-			++_g;
-			data.push("" + Std.string(item));
-		}
-		return "ArraySchema(" + Lambda.count(this.items) + ") { " + data.join(", ") + " } ";
-	}
-}
-io_colyseus_serializer_schema_ArraySchema.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_ArraySchema.prototype, {
-	__class__: io_colyseus_serializer_schema_ArraySchema
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_OrderedMapIterator {
-	constructor(omap) {
-		this.index = 0;
-		this.map = omap;
-	}
-	hasNext() {
-		return this.index < this.map._keys.length;
-	}
-	next() {
-		return this.map.get(this.map._keys[this.index++]);
-	}
-}
-io_colyseus_serializer_schema_OrderedMapIterator.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_OrderedMapIterator.prototype, {
-	__class__: io_colyseus_serializer_schema_OrderedMapIterator
-});
-class io_colyseus_serializer_schema_OrderedMap {
-	constructor(_map) {
-		this.idx = 0;
-		this._keys = [];
-		this.map = _map;
-	}
-	set(key,value) {
-		if(!this.map.exists(key)) {
-			this._keys.push(key);
-		}
-		this.map.set(key,value);
-	}
-	toString() {
-		var _ret = "";
-		var _cnt = 0;
-		var _len = this._keys.length;
-		var _g = 0;
-		var _g1 = this._keys;
-		while(_g < _g1.length) {
-			var k = _g1[_g];
-			++_g;
-			_ret += "" + Std.string(k) + " => " + Std.string(this.map.get(k)) + (_cnt++ < _len - 1 ? ", " : "");
-		}
-		return "{" + _ret + "}";
-	}
-	iterator() {
-		return new io_colyseus_serializer_schema_OrderedMapIterator(this);
-	}
-	remove(key) {
-		if(this.map.remove(key)) {
-			return HxOverrides.remove(this._keys,key);
-		} else {
-			return false;
-		}
-	}
-	exists(key) {
-		return this.map.exists(key);
-	}
-	get(key) {
-		return this.map.get(key);
-	}
-	keys() {
-		return HxOverrides.iter(this._keys);
-	}
-}
-io_colyseus_serializer_schema_OrderedMap.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_OrderedMap.prototype, {
-	__class__: io_colyseus_serializer_schema_OrderedMap
-});
-class io_colyseus_serializer_schema_MapSchema {
-	constructor() {
-		this.items = new io_colyseus_serializer_schema_OrderedMap(new haxe_ds_StringMap());
-	}
-	get_length() {
-		return this.items._keys.length;
-	}
-	onAdd(item,key) {
-	}
-	onChange(item,key) {
-	}
-	onRemove(item,key) {
-	}
-	clone() {
-		var cloned = new io_colyseus_serializer_schema_MapSchema();
-		var key = HxOverrides.iter(this.items._keys);
-		while(key.hasNext()) {
-			var key1 = key.next();
-			cloned.items.set(key1,this.items.get(key1));
-		}
-		cloned.onAdd = $bind(this,this.onAdd);
-		cloned.onChange = $bind(this,this.onChange);
-		cloned.onRemove = $bind(this,this.onRemove);
-		return cloned;
-	}
-	iterator() {
-		return this.items.iterator();
-	}
-	get(key) {
-		return this.items.get(key);
-	}
-	arrayWrite(key,value) {
-		this.items.set(key,value);
-		return value;
-	}
-	toString() {
-		var data = [];
-		var key = HxOverrides.iter(this.items._keys);
-		while(key.hasNext()) {
-			var key1 = key.next();
-			data.push(key1 + " => " + Std.string(this.items.get(key1)));
-		}
-		return "MapSchema (" + Lambda.count(this.items) + ") { " + data.join(", ") + " }";
-	}
-}
-io_colyseus_serializer_schema_MapSchema.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_MapSchema.prototype, {
-	__class__: io_colyseus_serializer_schema_MapSchema
-	,__properties__: {get_length: "get_length"}
-});
-class io_colyseus_serializer_schema_Schema {
-	constructor() {
-		if(io_colyseus_serializer_schema_Schema._hx_skip_constructor) {
-			return;
-		}
-		this._hx_constructor();
-	}
-	_hx_constructor() {
-		this._childPrimitiveTypes = new haxe_ds_IntMap();
-		this._childSchemaTypes = new haxe_ds_IntMap();
-		this._types = new haxe_ds_IntMap();
-		this._indexes = new haxe_ds_IntMap();
-	}
-	onChange(changes) {
-	}
-	onRemove() {
-	}
-	decode(bytes,it) {
-		var changes = [];
-		if(it == null) {
-			it = { offset : 0};
-		}
-		var totalBytes = bytes.length;
-		while(it.offset < totalBytes) {
-			var isNil = io_colyseus_serializer_schema_SPEC.nilCheck(bytes,it);
-			if(isNil) {
-				it.offset++;
-			}
-			var index = bytes.b[it.offset++];
-			if(index == io_colyseus_serializer_schema_SPEC.END_OF_STRUCTURE) {
-				break;
-			}
-			var field = this._indexes.h[index];
-			var type = this._types.h[index];
-			var value = null;
-			var hasChange = false;
-			if(field == null) {
-				continue;
-			} else if(isNil) {
-				value = null;
-				hasChange = true;
-			} else if(type == "ref") {
-				var constructor = this._childSchemaTypes.h[index];
-				value = Reflect.getProperty(this,field);
-				if(value == null) {
-					value = Type.createInstance(constructor,[]);
-				}
-				value.decode(bytes,it);
-				hasChange = true;
-			} else if(type == "array") {
-				var isSchemaType = this._childSchemaTypes.h.hasOwnProperty(index);
-				type = isSchemaType ? this._childSchemaTypes.h[index] : this._childPrimitiveTypes.h[index];
-				var valueRef = Reflect.getProperty(this,field);
-				if(valueRef == null) {
-					valueRef = new io_colyseus_serializer_schema_ArraySchema_$Dynamic();
-				}
-				value = valueRef.clone();
-				var newLength = io_colyseus_serializer_schema_Schema.decoder.number(bytes,it);
-				var numChanges = js_Boot.__cast(Math.min(io_colyseus_serializer_schema_Schema.decoder.number(bytes,it),newLength) , Int);
-				var hasRemoval = value.items.length > newLength;
-				hasChange = numChanges > 0 || hasRemoval;
-				var hasIndexChange = false;
-				if(hasRemoval) {
-					var items = js_Boot.__cast(valueRef.items , Array);
-					var _g = newLength;
-					var _g1 = valueRef.items.length;
-					while(_g < _g1) {
-						var i = _g++;
-						var itemRemoved = items[i];
-						if(isSchemaType && itemRemoved.onRemove != null) {
-							itemRemoved.onRemove();
-						}
-						HxOverrides.remove(js_Boot.__cast(value.items , Array),itemRemoved);
-						valueRef.onRemove(itemRemoved,newLength + i);
-					}
-				}
-				var _g2 = 0;
-				var _g11 = numChanges;
-				while(_g2 < _g11) {
-					var i1 = _g2++;
-					var newIndex = io_colyseus_serializer_schema_Schema.decoder.number(bytes,it);
-					var indexChangedFrom = -1;
-					if(io_colyseus_serializer_schema_SPEC.indexChangeCheck(bytes,it)) {
-						it.offset++;
-						indexChangedFrom = io_colyseus_serializer_schema_Schema.decoder.number(bytes,it);
-						hasIndexChange = true;
-					}
-					var isNew = !hasIndexChange && value.items[newIndex] == null || hasIndexChange && indexChangedFrom == -1;
-					if(isSchemaType) {
-						var item = null;
-						if(isNew) {
-							item = Type.createInstance(type,[]);
-						} else if(indexChangedFrom != -1) {
-							item = valueRef.items[indexChangedFrom];
-						} else {
-							item = valueRef.items[newIndex];
-						}
-						if(item == null) {
-							item = Type.createInstance(type,[]);
-							isNew = true;
-						}
-						item.decode(bytes,it);
-						value.items[newIndex] = item;
-					} else {
-						value.items[newIndex] = io_colyseus_serializer_schema_Schema.decoder.decodePrimitiveType(type,bytes,it);
-					}
-					if(isNew) {
-						valueRef.onAdd(value.items[newIndex],newIndex);
-					} else {
-						valueRef.onChange(value.items[newIndex],newIndex);
-					}
-				}
-			} else if(type == "map") {
-				var isSchemaType1 = this._childSchemaTypes.h.hasOwnProperty(index);
-				type = isSchemaType1 ? this._childSchemaTypes.h[index] : this._childPrimitiveTypes.h[index];
-				var valueRef1 = Reflect.getProperty(this,field);
-				if(valueRef1 == null) {
-					valueRef1 = new io_colyseus_serializer_schema_MapSchema_$Dynamic();
-				}
-				value = valueRef1.clone();
-				var length = io_colyseus_serializer_schema_Schema.decoder.number(bytes,it);
-				hasChange = length > 0;
-				var hasIndexChange1 = false;
-				var previousKeys = [];
-				var keysIterator = valueRef1.items.keys();
-				while(keysIterator.hasNext()) previousKeys.push(keysIterator.next());
-				var _g3 = 0;
-				var _g12 = length;
-				while(_g3 < _g12) {
-					var i2 = _g3++;
-					if(it.offset >= bytes.length || bytes.b[it.offset] == io_colyseus_serializer_schema_SPEC.END_OF_STRUCTURE) {
-						break;
-					}
-					var isNilItem = io_colyseus_serializer_schema_SPEC.nilCheck(bytes,it);
-					if(isNilItem) {
-						it.offset++;
-					}
-					var previousKey = "";
-					if(io_colyseus_serializer_schema_SPEC.indexChangeCheck(bytes,it)) {
-						it.offset++;
-						previousKey = previousKeys[io_colyseus_serializer_schema_Schema.decoder.number(bytes,it)];
-						hasIndexChange1 = true;
-					}
-					var hasMapIndex = io_colyseus_serializer_schema_SPEC.numberCheck(bytes,it);
-					var newKey = hasMapIndex ? previousKeys[io_colyseus_serializer_schema_Schema.decoder.number(bytes,it)] : io_colyseus_serializer_schema_Schema.decoder.string(bytes,it);
-					var item1;
-					var isNew1 = !hasIndexChange1 && !valueRef1.items.exists(newKey) || hasIndexChange1 && previousKey == "" && hasMapIndex;
-					if(isNew1 && isSchemaType1) {
-						item1 = Type.createInstance(type,[]);
-					} else if(previousKey != "") {
-						item1 = valueRef1.items.get(previousKey);
-					} else {
-						item1 = valueRef1.items.get(newKey);
-					}
-					if(isNilItem) {
-						if(item1 && isSchemaType1) {
-							item1.onRemove();
-						}
-						valueRef1.onRemove(item1,newKey);
-						value.items.remove(newKey);
-						continue;
-					} else if(!isSchemaType1) {
-						var decodedValue = io_colyseus_serializer_schema_Schema.decoder.decodePrimitiveType(type,bytes,it);
-						value.items.set(newKey,decodedValue);
-					} else {
-						item1.decode(bytes,it);
-						value.items.set(newKey,item1);
-					}
-					if(isNew1) {
-						valueRef1.onAdd(item1,newKey);
-					} else {
-						valueRef1.onChange(item1,newKey);
-					}
-				}
-			} else {
-				value = io_colyseus_serializer_schema_Schema.decoder.decodePrimitiveType(type,bytes,it);
-				hasChange = true;
-			}
-			if(hasChange) {
-				changes.push({ field : field, value : value, previousValue : Reflect.getProperty(this,field)});
-			}
-			this[field] = value;
-		}
-		if(changes.length > 0) {
-			this.onChange(changes);
-		}
-	}
-	toString() {
-		var data = [];
-		var field = this._indexes.iterator();
-		while(field.hasNext()) {
-			var field1 = field.next();
-			data.push(field1 + " => " + Std.string(Reflect.getProperty(this,field1)));
-		}
-		return "{ " + data.join(", ") + " }";
-	}
-}
-io_colyseus_serializer_schema_Schema.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_Schema.prototype, {
-	__class__: io_colyseus_serializer_schema_Schema
-});
-class io_colyseus_serializer_schema_Context {
-	constructor() {
-		this.schemas = [];
-		this.typeIds = new haxe_ds_IntMap();
-	}
-	add(schema,typeid) {
-		if(typeid == null) {
-			typeid = this.schemas.length;
-		}
-		this.typeIds.h[typeid] = schema;
-		this.schemas.push(schema);
-	}
-	get(typeid) {
-		return this.typeIds.h[typeid];
-	}
-}
-io_colyseus_serializer_schema_Context.__name__ = true;
-Object.assign(io_colyseus_serializer_schema_Context.prototype, {
-	__class__: io_colyseus_serializer_schema_Context
-});
-class io_colyseus_serializer_schema_ReflectionField extends io_colyseus_serializer_schema_Schema {
-	constructor() {
-		super();
-		this._indexes.h[0] = "name";
-		this._types.h[0] = "string";
-		this._indexes.h[1] = "type";
-		this._types.h[1] = "string";
-		this._indexes.h[2] = "referencedType";
-		this._types.h[2] = "uint8";
-	}
-}
-io_colyseus_serializer_schema_ReflectionField.__name__ = true;
-io_colyseus_serializer_schema_ReflectionField.__super__ = io_colyseus_serializer_schema_Schema;
-Object.assign(io_colyseus_serializer_schema_ReflectionField.prototype, {
-	__class__: io_colyseus_serializer_schema_ReflectionField
-});
-class io_colyseus_serializer_schema_ReflectionType extends io_colyseus_serializer_schema_Schema {
-	constructor() {
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = true;
-		super();
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = false;
-		this._hx_constructor();
-	}
-	_hx_constructor() {
-		this.fields = new io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionField();
-		super._hx_constructor();
-		this._indexes.h[0] = "id";
-		this._types.h[0] = "uint8";
-		this._indexes.h[1] = "fields";
-		this._types.h[1] = "array";
-		this._childSchemaTypes.h[1] = io_colyseus_serializer_schema_ReflectionField;
-	}
-}
-io_colyseus_serializer_schema_ReflectionType.__name__ = true;
-io_colyseus_serializer_schema_ReflectionType.__super__ = io_colyseus_serializer_schema_Schema;
-Object.assign(io_colyseus_serializer_schema_ReflectionType.prototype, {
-	__class__: io_colyseus_serializer_schema_ReflectionType
-});
-class io_colyseus_serializer_schema_Reflection extends io_colyseus_serializer_schema_Schema {
-	constructor() {
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = true;
-		super();
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = false;
-		this._hx_constructor();
-	}
-	_hx_constructor() {
-		this.types = new io_colyseus_serializer_schema_ArraySchema_$io_$colyseus_$serializer_$schema_$ReflectionType();
-		super._hx_constructor();
-		this._indexes.h[0] = "types";
-		this._types.h[0] = "array";
-		this._childSchemaTypes.h[0] = io_colyseus_serializer_schema_ReflectionType;
-		this._indexes.h[1] = "rootType";
-		this._types.h[1] = "uint8";
-	}
-}
-io_colyseus_serializer_schema_Reflection.__name__ = true;
-io_colyseus_serializer_schema_Reflection.__super__ = io_colyseus_serializer_schema_Schema;
-Object.assign(io_colyseus_serializer_schema_Reflection.prototype, {
-	__class__: io_colyseus_serializer_schema_Reflection
-});
 class js__$Boot_HaxeError extends Error {
 	constructor(val) {
 		super();
@@ -1480,28 +741,7 @@ class js__$Boot_HaxeError extends Error {
 	}
 }
 js__$Boot_HaxeError.__name__ = true;
-js__$Boot_HaxeError.__super__ = Error;
-Object.assign(js__$Boot_HaxeError.prototype, {
-	__class__: js__$Boot_HaxeError
-});
 class js_Boot {
-	static getClass(o) {
-		if(o == null) {
-			return null;
-		} else if(((o) instanceof Array)) {
-			return Array;
-		} else {
-			var cl = o.__class__;
-			if(cl != null) {
-				return cl;
-			}
-			var name = js_Boot.__nativeClassName(o);
-			if(name != null) {
-				return js_Boot.__resolveNativeClass(name);
-			}
-			return null;
-		}
-	}
 	static __string_rec(o,s) {
 		if(o == null) {
 			return "null";
@@ -1595,222 +835,244 @@ class js_Boot {
 			return String(o);
 		}
 	}
-	static __interfLoop(cc,cl) {
-		if(cc == null) {
-			return false;
-		}
-		if(cc == cl) {
-			return true;
-		}
-		if(Object.prototype.hasOwnProperty.call(cc,"__interfaces__")) {
-			var intf = cc.__interfaces__;
-			var _g = 0;
-			var _g1 = intf.length;
-			while(_g < _g1) {
-				var i = _g++;
-				var i1 = intf[i];
-				if(i1 == cl || js_Boot.__interfLoop(i1,cl)) {
-					return true;
-				}
-			}
-		}
-		return js_Boot.__interfLoop(cc.__super__,cl);
-	}
-	static __instanceof(o,cl) {
-		if(cl == null) {
-			return false;
-		}
-		switch(cl) {
-		case Array:
-			return ((o) instanceof Array);
-		case Bool:
-			return typeof(o) == "boolean";
-		case Dynamic:
-			return o != null;
-		case Float:
-			return typeof(o) == "number";
-		case Int:
-			if(typeof(o) == "number") {
-				return ((o | 0) === o);
-			} else {
-				return false;
-			}
-			break;
-		case String:
-			return typeof(o) == "string";
-		default:
-			if(o != null) {
-				if(typeof(cl) == "function") {
-					if(js_Boot.__downcastCheck(o,cl)) {
-						return true;
-					}
-				} else if(typeof(cl) == "object" && js_Boot.__isNativeObj(cl)) {
-					if(((o) instanceof cl)) {
-						return true;
-					}
-				}
-			} else {
-				return false;
-			}
-			if(cl == Class ? o.__name__ != null : false) {
-				return true;
-			}
-			if(cl == Enum ? o.__ename__ != null : false) {
-				return true;
-			}
-			return o.__enum__ != null ? $hxEnums[o.__enum__] == cl : false;
-		}
-	}
-	static __downcastCheck(o,cl) {
-		if(!((o) instanceof cl)) {
-			if(cl.__isInterface__) {
-				return js_Boot.__interfLoop(js_Boot.getClass(o),cl);
-			} else {
-				return false;
-			}
-		} else {
-			return true;
-		}
-	}
-	static __cast(o,t) {
-		if(o == null || js_Boot.__instanceof(o,t)) {
-			return o;
-		} else {
-			throw new js__$Boot_HaxeError("Cannot cast " + Std.string(o) + " to " + Std.string(t));
-		}
-	}
-	static __nativeClassName(o) {
-		var name = js_Boot.__toStr.call(o).slice(8,-1);
-		if(name == "Object" || name == "Function" || name == "Math" || name == "JSON") {
-			return null;
-		}
-		return name;
-	}
-	static __isNativeObj(o) {
-		return js_Boot.__nativeClassName(o) != null;
-	}
-	static __resolveNativeClass(name) {
-		return $global[name];
-	}
 }
 js_Boot.__name__ = true;
-class schema_Entity extends io_colyseus_serializer_schema_Schema {
-	constructor() {
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = true;
-		super();
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = false;
-		this._hx_constructor();
+class zero_extensions_ArrayExt {
+	static strings_to_ints(array) {
+		var _g = [];
+		var _g1 = 0;
+		while(_g1 < array.length) {
+			var s = array[_g1];
+			++_g1;
+			_g.push(Std.parseInt(s));
+		}
+		return _g;
 	}
-	_hx_constructor() {
-		this.timer = 0;
-		this.child = "";
-		this.parent = "";
-		this.state = 0;
-		this.type = 0;
-		this.weight = 0;
-		this.next_target_y = 0;
-		this.next_target_x = 0;
-		this.target_y = 0;
-		this.target_x = 0;
-		this.rotation = 0;
-		this.y = 0;
-		this.x = 0;
-		this.id = "";
-		super._hx_constructor();
-		this._indexes.h[0] = "id";
-		this._types.h[0] = "string";
-		this._indexes.h[1] = "x";
-		this._types.h[1] = "number";
-		this._indexes.h[2] = "y";
-		this._types.h[2] = "number";
-		this._indexes.h[3] = "rotation";
-		this._types.h[3] = "number";
-		this._indexes.h[4] = "target_x";
-		this._types.h[4] = "number";
-		this._indexes.h[5] = "target_y";
-		this._types.h[5] = "number";
-		this._indexes.h[6] = "next_target_x";
-		this._types.h[6] = "number";
-		this._indexes.h[7] = "next_target_y";
-		this._types.h[7] = "number";
-		this._indexes.h[8] = "weight";
-		this._types.h[8] = "number";
-		this._indexes.h[9] = "type";
-		this._types.h[9] = "uint8";
-		this._indexes.h[10] = "state";
-		this._types.h[10] = "uint8";
-		this._indexes.h[11] = "parent";
-		this._types.h[11] = "string";
-		this._indexes.h[12] = "child";
-		this._types.h[12] = "string";
-		this._indexes.h[13] = "timer";
-		this._types.h[13] = "number";
+	static contains(array,value) {
+		return array.indexOf(value) >= 0;
+	}
+	static last(a) {
+		return a[a.length - 1];
+	}
+	static get_random(array) {
+		var def_max = array.length;
+		var max = null;
+		return array[Math.random() * (max == null ? def_max : max) | 0];
+	}
+	static shuffle(array) {
+		var _g = 0;
+		var _g1 = array.length;
+		while(_g < _g1) {
+			var i = _g++;
+			var def_max = array.length;
+			var max = null;
+			var j = Math.random() * (max == null ? def_max : max) | 0;
+			var a = array[i];
+			var b = array[j];
+			array[i] = b;
+			array[j] = a;
+		}
+		return array;
+	}
+	static merge(a1,a2) {
+		var _g = 0;
+		while(_g < a2.length) {
+			var o = a2[_g];
+			++_g;
+			a1.push(o);
+		}
+		return a1;
+	}
+	static flatten(a) {
+		var _g = [];
+		var _g1 = 0;
+		while(_g1 < a.length) {
+			var row = a[_g1];
+			++_g1;
+			var _g11 = 0;
+			while(_g11 < row.length) {
+				var e = row[_g11];
+				++_g11;
+				_g.push(e);
+			}
+		}
+		return _g;
+	}
+	static expand(a,row_width) {
+		var out = [];
+		var _g = 0;
+		var _g1 = a.length;
+		while(_g < _g1) {
+			var i = _g++;
+			if(i % row_width == 0) {
+				out.push([]);
+			}
+			out[out.length - 1].push(a[i]);
+		}
+		return out;
+	}
+	static flood_fill_2D(array,x,y,value) {
+		if(x < 0 || y < 0 || y >= array.length || x >= array[y].length) {
+			return;
+		}
+		var target_value = array[y][x];
+		var validate = function(x1,y1) {
+			if(!(x1 < 0 || y1 < 0 || y1 >= array.length || x1 >= array[y1].length)) {
+				return array[y1][x1] == target_value;
+			} else {
+				return false;
+			}
+		};
+		var queue = [{ x : x, y : y}];
+		while(queue.length > 0) {
+			var point = queue.shift();
+			array[point.y][point.x] = value;
+			if(validate(point.x,point.y - 1)) {
+				queue.push({ x : point.x, y : point.y - 1});
+			}
+			if(validate(point.x,point.y + 1)) {
+				queue.push({ x : point.x, y : point.y + 1});
+			}
+			if(validate(point.x - 1,point.y)) {
+				queue.push({ x : point.x - 1, y : point.y});
+			}
+			if(validate(point.x + 1,point.y)) {
+				queue.push({ x : point.x + 1, y : point.y});
+			}
+		}
+	}
+	static flood_fill_1D(array,pos,value) {
+		if(pos < 0 || pos > array.length) {
+			return;
+		}
+		var target_value = array[pos];
+		var validate = function(pos1) {
+			if(!(pos1 < 0 || pos1 > array.length)) {
+				return array[pos1] == target_value;
+			} else {
+				return false;
+			}
+		};
+		var queue = [pos];
+		while(queue.length > 0) {
+			var pos2 = queue.shift();
+			array[pos2] = value;
+			if(validate(pos2 - 1)) {
+				queue.push(pos2 - 1);
+			}
+			if(validate(pos2 + 1)) {
+				queue.push(pos2 + 1);
+			}
+		}
+	}
+	static heat_map(array,x,y,max_value) {
+		if(max_value == null) {
+			max_value = -1;
+		}
+		if(x < 0 || y < 0 || y >= array.length || x >= array[y].length) {
+			return [];
+		}
+		var value = -1;
+		var _g = [];
+		var _g1 = 0;
+		while(_g1 < array.length) {
+			var row = array[_g1];
+			++_g1;
+			var _g11 = [];
+			var _g2 = 0;
+			while(_g2 < row.length) {
+				var v = row[_g2];
+				++_g2;
+				_g11.push(0);
+			}
+			_g.push(_g11);
+		}
+		var map = _g;
+		var min = 0;
+		var target_value = array[y][x];
+		var validate = function(x1,y1) {
+			if(!(x1 < 0 || y1 < 0 || y1 >= array.length || x1 >= array[y1].length) && array[y1][x1] == target_value) {
+				return map[y1][x1] == 0;
+			} else {
+				return false;
+			}
+		};
+		var queue = [{ x : x, y : y, value : value}];
+		while(queue.length > 0) {
+			var point = queue.shift();
+			map[point.y][point.x] = point.value;
+			min = Math.round(Math.min(point.value,min));
+			if(validate(point.x,point.y - 1)) {
+				queue.push({ x : point.x, y : point.y - 1, value : point.value - 1});
+			}
+			if(validate(point.x,point.y + 1)) {
+				queue.push({ x : point.x, y : point.y + 1, value : point.value - 1});
+			}
+			if(validate(point.x - 1,point.y)) {
+				queue.push({ x : point.x - 1, y : point.y, value : point.value - 1});
+			}
+			if(validate(point.x + 1,point.y)) {
+				queue.push({ x : point.x + 1, y : point.y, value : point.value - 1});
+			}
+		}
+		var diff = max_value < 0 ? -min + 1 : -min + 1 - (-min - max_value);
+		var _g21 = 0;
+		var _g3 = map.length;
+		while(_g21 < _g3) {
+			var j = _g21++;
+			var _g22 = 0;
+			var _g31 = map[j].length;
+			while(_g22 < _g31) {
+				var i = _g22++;
+				if(map[j][i] != 0) {
+					map[j][i] = Math.round(Math.max(map[j][i] + diff,0));
+				}
+			}
+		}
+		return map;
+	}
+	static get_xy(array,x,y) {
+		y = Math.floor(Math.min(Math.max(y,0),array.length - 1));
+		x = Math.floor(Math.min(Math.max(x,0),array[y].length - 1));
+		return array[y][x];
+	}
+	static set_xy(array,x,y,value) {
+		y = Math.floor(Math.min(Math.max(y,0),array.length - 1));
+		x = Math.floor(Math.min(Math.max(x,0),array[y].length - 1));
+		array[y][x] = value;
+	}
+	static median(array) {
+		return array[Math.floor(array.length * 0.5)];
+	}
+	static equals(a1,a2) {
+		if(a1.length != a2.length) {
+			return false;
+		}
+		var _g = 0;
+		var _g1 = a1.length;
+		while(_g < _g1) {
+			var i = _g++;
+			if(a1[i] != a2[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	static remove_duplicates(arr) {
+		var unique = [];
+		var _g = 0;
+		while(_g < arr.length) {
+			var item = arr[_g];
+			++_g;
+			if(unique.indexOf(item) < 0) {
+				unique.push(item);
+			}
+		}
+		arr = unique;
+		return arr;
 	}
 }
-schema_Entity.__name__ = true;
-schema_Entity.__super__ = io_colyseus_serializer_schema_Schema;
-Object.assign(schema_Entity.prototype, {
-	__class__: schema_Entity
-});
-class schema_GameState extends io_colyseus_serializer_schema_Schema {
-	constructor() {
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = true;
-		super();
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = false;
-		this._hx_constructor();
-	}
-	_hx_constructor() {
-		this.time = 0;
-		this.entities = new io_colyseus_serializer_schema_MapSchema_$schema_$Entity();
-		this.world = new schema_World();
-		super._hx_constructor();
-		this._indexes.h[0] = "world";
-		this._types.h[0] = "ref";
-		this._childSchemaTypes.h[0] = schema_World;
-		this._indexes.h[1] = "entities";
-		this._types.h[1] = "map";
-		this._childSchemaTypes.h[1] = schema_Entity;
-		this._indexes.h[2] = "time";
-		this._types.h[2] = "number";
-	}
-}
-schema_GameState.__name__ = true;
-schema_GameState.__super__ = io_colyseus_serializer_schema_Schema;
-Object.assign(schema_GameState.prototype, {
-	__class__: schema_GameState
-});
-class schema_Player extends schema_Entity {
-	constructor() {
-		super();
-	}
-}
-schema_Player.__name__ = true;
-schema_Player.__super__ = schema_Entity;
-Object.assign(schema_Player.prototype, {
-	__class__: schema_Player
-});
-class schema_World extends io_colyseus_serializer_schema_Schema {
-	constructor() {
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = true;
-		super();
-		io_colyseus_serializer_schema_Schema._hx_skip_constructor = false;
-		this._hx_constructor();
-	}
-	_hx_constructor() {
-		this.height = 0;
-		this.width = 0;
-		super._hx_constructor();
-		this._indexes.h[0] = "width";
-		this._types.h[0] = "number";
-		this._indexes.h[1] = "height";
-		this._types.h[1] = "number";
-	}
-}
-schema_World.__name__ = true;
-schema_World.__super__ = io_colyseus_serializer_schema_Schema;
-Object.assign(schema_World.prototype, {
-	__class__: schema_World
-});
+zero_extensions_ArrayExt.__name__ = true;
 class zero_extensions_FloatExt {
 	static rad_to_deg(rad) {
 		return rad * (180 / Math.PI);
@@ -1937,6 +1199,354 @@ class zero_extensions_FloatExt {
 	}
 }
 zero_extensions_FloatExt.__name__ = true;
+class zero_utilities_AStar {
+	static get_path(map,options) {
+		if(options.mode == null) {
+			options.mode = zero_utilities_EAStarMode.CARDINAL_ONLY;
+		}
+		if(options.simplify == null) {
+			options.simplify = zero_utilities_EAStarSimplifyMode.REMOVE_NODES_ON_PATH;
+		}
+		if(options.heuristic == null) {
+			options.heuristic = function(i) {
+				return 0;
+			};
+		}
+		if(options.mode == zero_utilities_EAStarMode.DIAGONAL && options.simplify == zero_utilities_EAStarSimplifyMode.LINE_OF_SIGHT_NO_DIAGONAL) {
+			options.mode = zero_utilities_EAStarMode.CARDINAL_ONLY;
+		}
+		var start_node = zero_utilities_AStar.get_node(options.start);
+		var end_node = zero_utilities_AStar.get_node(options.end);
+		var open = [start_node];
+		var closed = [];
+		while(open.length > 0) {
+			open.sort(zero_utilities_AStar.sort_nodes);
+			var current_node = open.shift();
+			closed.push(current_node);
+			var this1 = current_node.position;
+			var p = options.end;
+			if(this1[0] == p[0] && this1[1] == p[1]) {
+				var path = [];
+				var current = current_node;
+				while(current != null) {
+					path.unshift(current.position);
+					current = current.parent;
+				}
+				var _g = 0;
+				while(_g < open.length) {
+					var node = open[_g];
+					++_g;
+					zero_utilities_AStar.destroy_node(node);
+				}
+				path = zero_utilities_AStar.simplify(path,map,options.simplify,options.passable);
+				return path;
+			}
+			var children = [];
+			var new_positions;
+			switch(options.mode._hx_index) {
+			case 0:
+				new_positions = [zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([0,-1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([0,1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([-1,0]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([1,0])];
+				break;
+			case 1:
+				new_positions = [zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([0,-1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([0,1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([-1,0]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([1,0]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([-1,-1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([1,-1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([-1,1]),zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([1,1])];
+				break;
+			}
+			var _g1 = 0;
+			while(_g1 < new_positions.length) {
+				var p1 = new_positions[_g1];
+				++_g1;
+				var node_pos = zero_utilities__$IntPoint_IntPoint_$Impl_$.add(current_node.position,p1);
+				if(zero_utilities_AStar.validate_position(node_pos,map,options.passable)) {
+					children.push({ position : node_pos, parent : current_node, f : 0, h : 0, g : 0});
+				}
+			}
+			var _g2 = 0;
+			while(_g2 < children.length) {
+				var node1 = children[_g2];
+				++_g2;
+				if(zero_utilities_AStar.in_closed(closed,node1)) {
+					continue;
+				}
+				node1.g = current_node.g + 1;
+				var this2 = zero_utilities__$IntPoint_IntPoint_$Impl_$.subtract(end_node.position,zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int(node1.position));
+				node1.h = Math.sqrt(this2[0] * this2[0] + this2[1] * this2[1]) + options.heuristic(map[node1.position[1]][node1.position[0]]);
+				node1.f = node1.g + node1.h;
+				if(zero_utilities_AStar.in_open(open,node1)) {
+					continue;
+				}
+				open.push(node1);
+			}
+		}
+		var _g3 = 0;
+		while(_g3 < open.length) {
+			var node2 = open[_g3];
+			++_g3;
+			zero_utilities_AStar.destroy_node(node2);
+		}
+		var _g11 = 0;
+		while(_g11 < closed.length) {
+			var node3 = closed[_g11];
+			++_g11;
+			zero_utilities_AStar.destroy_node(node3);
+		}
+		return [];
+	}
+	static print(map,path,passable) {
+		var node_markers = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳ⓐⓑⓒⓓⓔⓕⓖⓗⓘⓙⓚⓛⓜⓝⓞⓟⓠⓡⓢⓣⓤⓥⓦⓧⓨⓩⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ";
+		var _g = [];
+		var _g1 = 0;
+		while(_g1 < map.length) {
+			var row = map[_g1];
+			++_g1;
+			var _g11 = [];
+			var _g2 = 0;
+			while(_g2 < row.length) {
+				var i = row[_g2];
+				++_g2;
+				_g11.push(passable.indexOf(i) >= 0 ? " " : "⬛");
+			}
+			_g.push(_g11);
+		}
+		var arr = _g;
+		var _g21 = 0;
+		var _g3 = path.length;
+		while(_g21 < _g3) {
+			var i1 = _g21++;
+			arr[path[i1][1]][path[i1][0]] = node_markers.charAt(i1 % node_markers.length);
+		}
+		var _g4 = 0;
+		while(_g4 < arr.length) {
+			var row1 = arr[_g4];
+			++_g4;
+			console.log("zero/utilities/AStar.hx:105:",row1.join("."));
+		}
+	}
+	static destroy_node(node) {
+		zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(node.position);
+		node.position = null;
+		node = null;
+	}
+	static in_closed(closed,node) {
+		var _g = 0;
+		while(_g < closed.length) {
+			var closed_node = closed[_g];
+			++_g;
+			var this1 = node.position;
+			var p = closed_node.position;
+			if(this1[0] == p[0] && this1[1] == p[1]) {
+				return true;
+			}
+		}
+		return false;
+	}
+	static in_open(open,node) {
+		var _g = 0;
+		while(_g < open.length) {
+			var open_node = open[_g];
+			++_g;
+			var this1 = node.position;
+			var p = open_node.position;
+			if(this1[0] == p[0] && this1[1] == p[1]) {
+				if(node.g < open_node.g) {
+					open_node.g = node.g;
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+	static validate_position(p,map,passable) {
+		if(p[1] > 0 && p[0] > 0 && p[1] < map.length && p[0] < map[p[1]].length) {
+			return passable.indexOf(map[p[1]][p[0]]) >= 0;
+		} else {
+			return false;
+		}
+	}
+	static sort_nodes(n1,n2) {
+		if(n1.f < n2.f) {
+			return -1;
+		} else if(n1.f > n2.f) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+	static get_node(position,parent) {
+		return { position : position, parent : parent, g : 0, h : 0, f : 0};
+	}
+	static simplify(points,map,mode,passable) {
+		switch(mode._hx_index) {
+		case 0:
+			return points;
+		case 1:
+			return zero_utilities_AStar.remove_nodes_on_path(points,map);
+		case 2:
+			return zero_utilities_AStar.los_simplify(points,map,passable);
+		case 3:
+			return zero_utilities_AStar.los_nd_simplify(points,map,passable);
+		}
+	}
+	static remove_nodes_on_path(points,map) {
+		if(points.length < 2) {
+			return points;
+		}
+		var last = points.shift();
+		var next = points.shift();
+		var v = zero_utilities__$IntPoint_IntPoint_$Impl_$.subtract(next,last);
+		var out = [last];
+		while(points.length > 0) {
+			last = next;
+			next = points.shift();
+			var v2 = zero_utilities__$IntPoint_IntPoint_$Impl_$.subtract(next,last);
+			if(!(v[0] == v2[0] && v[1] == v2[1])) {
+				out.push(zero_utilities__$IntPoint_IntPoint_$Impl_$.get(last[0],last[1]));
+			}
+			zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(last);
+			last = null;
+			v = v2;
+		}
+		out.push(next);
+		return out;
+	}
+	static los_simplify(points,map,passable) {
+		if(points.length < 2) {
+			return points;
+		}
+		var last = points.shift();
+		var current = points.shift();
+		var next = points.shift();
+		var out = [last];
+		while(points.length > 0) if(zero_utilities_AStar.los(last,next,map,passable)) {
+			var t = current;
+			current = next;
+			next = points.shift();
+			zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(t);
+			t = null;
+		} else {
+			var t1 = last;
+			out.push(current);
+			last = current;
+			zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(t1);
+			t1 = null;
+		}
+		out.push(next);
+		return out;
+	}
+	static los(p1,p2,map,passable) {
+		var d = zero_utilities__$IntPoint_IntPoint_$Impl_$.subtract(p2,p1);
+		var s = zero_utilities__$IntPoint_IntPoint_$Impl_$.from_array_int([p1[0] < p2[0] ? 1 : -1,p1[1] < p2[1] ? 1 : -1]);
+		var next = zero_utilities__$IntPoint_IntPoint_$Impl_$.add_int(p1,0);
+		var dist = Math.sqrt(d[0] * d[0] + d[1] * d[1]);
+		while(next[0] != p2[0] && next[1] != p2[1]) {
+			if(passable.indexOf(map[next[1]][next[0]]) == -1) {
+				zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(d);
+				d = null;
+				zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(s);
+				s = null;
+				zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(next);
+				next = null;
+				return false;
+			}
+			if(Math.abs(d[1] * (next[0] - p1[0] + s[0]) - d[0] * (next[1] - p1[1])) / dist < 0.5) {
+				next[0] += s[0];
+			} else if(Math.abs(d[1] * (next[0] - p1[0]) - d[0] * (next[1] - p1[1] + s[1])) / dist < 0.5) {
+				next[1] += s[1];
+			} else {
+				next = zero_utilities__$IntPoint_IntPoint_$Impl_$.add(next,s);
+			}
+		}
+		zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(d);
+		d = null;
+		zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(s);
+		s = null;
+		zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(next);
+		next = null;
+		return true;
+	}
+	static los_nd_simplify(points,map,passable) {
+		if(points.length < 2) {
+			return points;
+		}
+		var last = points.shift();
+		var current = points.shift();
+		var next = points.shift();
+		var out = [zero_utilities__$IntPoint_IntPoint_$Impl_$.get(last[0],last[1])];
+		while(points.length > 0) if(zero_utilities_AStar.los_no_diagonal(zero_utilities__$IntPoint_IntPoint_$Impl_$.get(last[0],last[1]),next,map,passable)) {
+			var x = next[0];
+			var y = next[1];
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			current[0] = x;
+			current[1] = y;
+			next = points.shift();
+		} else {
+			out.push(zero_utilities__$IntPoint_IntPoint_$Impl_$.get(current[0],current[1]));
+			var x1 = current[0];
+			var y1 = current[1];
+			if(y1 == null) {
+				y1 = 0;
+			}
+			if(x1 == null) {
+				x1 = 0;
+			}
+			last[0] = x1;
+			last[1] = y1;
+		}
+		if(next != null) {
+			out.push(zero_utilities__$IntPoint_IntPoint_$Impl_$.get(next[0],next[1]));
+		}
+		return out;
+	}
+	static los_no_diagonal(p1,p2,map,passable) {
+		var dx = Math.floor(Math.abs(p2[0] - p1[0]));
+		var dy = Math.floor(Math.abs(p2[1] - p1[1]));
+		var sx = p1[0] < p2[0] ? 1 : -1;
+		var sy = p1[1] < p2[1] ? 1 : -1;
+		var err = dx - dy;
+		var e2;
+		while(!(p1[0] == p2[0] && p1[1] == p2[1])) {
+			if(passable.indexOf(map[p1[1]][p1[0]]) == -1) {
+				zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(p1);
+				p1 = null;
+				return false;
+			}
+			e2 = err * 2;
+			if(dy > dx) {
+				if(e2 > -dy) {
+					err -= dy;
+					p1[0] += sx;
+				} else if(e2 < dx) {
+					err += dx;
+					p1[1] += sy;
+				}
+			} else if(e2 < dx) {
+				err += dx;
+				p1[1] += sy;
+			} else if(e2 > -dy) {
+				err -= dy;
+				p1[0] += sx;
+			}
+		}
+		zero_utilities__$IntPoint_IntPoint_$Impl_$.pool.push(p1);
+		p1 = null;
+		return true;
+	}
+}
+zero_utilities_AStar.__name__ = true;
+var zero_utilities_EAStarMode = $hxEnums["zero.utilities.EAStarMode"] = { __ename__ : true, __constructs__ : ["CARDINAL_ONLY","DIAGONAL"]
+	,CARDINAL_ONLY: {_hx_index:0,__enum__:"zero.utilities.EAStarMode",toString:$estr}
+	,DIAGONAL: {_hx_index:1,__enum__:"zero.utilities.EAStarMode",toString:$estr}
+};
+var zero_utilities_EAStarSimplifyMode = $hxEnums["zero.utilities.EAStarSimplifyMode"] = { __ename__ : true, __constructs__ : ["NONE","REMOVE_NODES_ON_PATH","LINE_OF_SIGHT","LINE_OF_SIGHT_NO_DIAGONAL"]
+	,NONE: {_hx_index:0,__enum__:"zero.utilities.EAStarSimplifyMode",toString:$estr}
+	,REMOVE_NODES_ON_PATH: {_hx_index:1,__enum__:"zero.utilities.EAStarSimplifyMode",toString:$estr}
+	,LINE_OF_SIGHT: {_hx_index:2,__enum__:"zero.utilities.EAStarSimplifyMode",toString:$estr}
+	,LINE_OF_SIGHT_NO_DIAGONAL: {_hx_index:3,__enum__:"zero.utilities.EAStarSimplifyMode",toString:$estr}
+};
 class zero_utilities__$Vec4_Vec4_$Impl_$ {
 	static zero(n) {
 		if(Math.abs(n) <= zero_utilities__$Vec4_Vec4_$Impl_$.epsilon) {
@@ -3180,7 +2790,6 @@ class zero_utilities__$Vec4_Vec4_$Impl_$ {
 	}
 }
 zero_utilities__$Vec4_Vec4_$Impl_$.__name__ = true;
-zero_utilities__$Vec4_Vec4_$Impl_$.__properties__ = {get_wwww: "get_wwww",get_wwwz: "get_wwwz",get_wwwy: "get_wwwy",get_wwwx: "get_wwwx",get_wwzw: "get_wwzw",get_wwzz: "get_wwzz",get_wwzy: "get_wwzy",get_wwzx: "get_wwzx",get_wwyw: "get_wwyw",get_wwyz: "get_wwyz",get_wwyy: "get_wwyy",get_wwyx: "get_wwyx",get_wwxw: "get_wwxw",get_wwxz: "get_wwxz",get_wwxy: "get_wwxy",get_wwxx: "get_wwxx",get_wzww: "get_wzww",get_wzwz: "get_wzwz",get_wzwy: "get_wzwy",get_wzwx: "get_wzwx",get_wzzw: "get_wzzw",get_wzzz: "get_wzzz",get_wzzy: "get_wzzy",get_wzzx: "get_wzzx",get_wzyw: "get_wzyw",get_wzyz: "get_wzyz",get_wzyy: "get_wzyy",get_wzyx: "get_wzyx",get_wzxw: "get_wzxw",get_wzxz: "get_wzxz",get_wzxy: "get_wzxy",get_wzxx: "get_wzxx",get_wyww: "get_wyww",get_wywz: "get_wywz",get_wywy: "get_wywy",get_wywx: "get_wywx",get_wyzw: "get_wyzw",get_wyzz: "get_wyzz",get_wyzy: "get_wyzy",get_wyzx: "get_wyzx",get_wyyw: "get_wyyw",get_wyyz: "get_wyyz",get_wyyy: "get_wyyy",get_wyyx: "get_wyyx",get_wyxw: "get_wyxw",get_wyxz: "get_wyxz",get_wyxy: "get_wyxy",get_wyxx: "get_wyxx",get_wxww: "get_wxww",get_wxwz: "get_wxwz",get_wxwy: "get_wxwy",get_wxwx: "get_wxwx",get_wxzw: "get_wxzw",get_wxzz: "get_wxzz",get_wxzy: "get_wxzy",get_wxzx: "get_wxzx",get_wxyw: "get_wxyw",get_wxyz: "get_wxyz",get_wxyy: "get_wxyy",get_wxyx: "get_wxyx",get_wxxw: "get_wxxw",get_wxxz: "get_wxxz",get_wxxy: "get_wxxy",get_wxxx: "get_wxxx",get_zwww: "get_zwww",get_zwwz: "get_zwwz",get_zwwy: "get_zwwy",get_zwwx: "get_zwwx",get_zwzw: "get_zwzw",get_zwzz: "get_zwzz",get_zwzy: "get_zwzy",get_zwzx: "get_zwzx",get_zwyw: "get_zwyw",get_zwyz: "get_zwyz",get_zwyy: "get_zwyy",get_zwyx: "get_zwyx",get_zwxw: "get_zwxw",get_zwxz: "get_zwxz",get_zwxy: "get_zwxy",get_zwxx: "get_zwxx",get_zzww: "get_zzww",get_zzwz: "get_zzwz",get_zzwy: "get_zzwy",get_zzwx: "get_zzwx",get_zzzw: "get_zzzw",get_zzzz: "get_zzzz",get_zzzy: "get_zzzy",get_zzzx: "get_zzzx",get_zzyw: "get_zzyw",get_zzyz: "get_zzyz",get_zzyy: "get_zzyy",get_zzyx: "get_zzyx",get_zzxw: "get_zzxw",get_zzxz: "get_zzxz",get_zzxy: "get_zzxy",get_zzxx: "get_zzxx",get_zyww: "get_zyww",get_zywz: "get_zywz",get_zywy: "get_zywy",get_zywx: "get_zywx",get_zyzw: "get_zyzw",get_zyzz: "get_zyzz",get_zyzy: "get_zyzy",get_zyzx: "get_zyzx",get_zyyw: "get_zyyw",get_zyyz: "get_zyyz",get_zyyy: "get_zyyy",get_zyyx: "get_zyyx",get_zyxw: "get_zyxw",get_zyxz: "get_zyxz",get_zyxy: "get_zyxy",get_zyxx: "get_zyxx",get_zxww: "get_zxww",get_zxwz: "get_zxwz",get_zxwy: "get_zxwy",get_zxwx: "get_zxwx",get_zxzw: "get_zxzw",get_zxzz: "get_zxzz",get_zxzy: "get_zxzy",get_zxzx: "get_zxzx",get_zxyw: "get_zxyw",get_zxyz: "get_zxyz",get_zxyy: "get_zxyy",get_zxyx: "get_zxyx",get_zxxw: "get_zxxw",get_zxxz: "get_zxxz",get_zxxy: "get_zxxy",get_zxxx: "get_zxxx",get_ywww: "get_ywww",get_ywwz: "get_ywwz",get_ywwy: "get_ywwy",get_ywwx: "get_ywwx",get_ywzw: "get_ywzw",get_ywzz: "get_ywzz",get_ywzy: "get_ywzy",get_ywzx: "get_ywzx",get_ywyw: "get_ywyw",get_ywyz: "get_ywyz",get_ywyy: "get_ywyy",get_ywyx: "get_ywyx",get_ywxw: "get_ywxw",get_ywxz: "get_ywxz",get_ywxy: "get_ywxy",get_ywxx: "get_ywxx",get_yzww: "get_yzww",get_yzwz: "get_yzwz",get_yzwy: "get_yzwy",get_yzwx: "get_yzwx",get_yzzw: "get_yzzw",get_yzzz: "get_yzzz",get_yzzy: "get_yzzy",get_yzzx: "get_yzzx",get_yzyw: "get_yzyw",get_yzyz: "get_yzyz",get_yzyy: "get_yzyy",get_yzyx: "get_yzyx",get_yzxw: "get_yzxw",get_yzxz: "get_yzxz",get_yzxy: "get_yzxy",get_yzxx: "get_yzxx",get_yyww: "get_yyww",get_yywz: "get_yywz",get_yywy: "get_yywy",get_yywx: "get_yywx",get_yyzw: "get_yyzw",get_yyzz: "get_yyzz",get_yyzy: "get_yyzy",get_yyzx: "get_yyzx",get_yyyw: "get_yyyw",get_yyyz: "get_yyyz",get_yyyy: "get_yyyy",get_yyyx: "get_yyyx",get_yyxw: "get_yyxw",get_yyxz: "get_yyxz",get_yyxy: "get_yyxy",get_yyxx: "get_yyxx",get_yxww: "get_yxww",get_yxwz: "get_yxwz",get_yxwy: "get_yxwy",get_yxwx: "get_yxwx",get_yxzw: "get_yxzw",get_yxzz: "get_yxzz",get_yxzy: "get_yxzy",get_yxzx: "get_yxzx",get_yxyw: "get_yxyw",get_yxyz: "get_yxyz",get_yxyy: "get_yxyy",get_yxyx: "get_yxyx",get_yxxw: "get_yxxw",get_yxxz: "get_yxxz",get_yxxy: "get_yxxy",get_yxxx: "get_yxxx",get_xwww: "get_xwww",get_xwwz: "get_xwwz",get_xwwy: "get_xwwy",get_xwwx: "get_xwwx",get_xwzw: "get_xwzw",get_xwzz: "get_xwzz",get_xwzy: "get_xwzy",get_xwzx: "get_xwzx",get_xwyw: "get_xwyw",get_xwyz: "get_xwyz",get_xwyy: "get_xwyy",get_xwyx: "get_xwyx",get_xwxw: "get_xwxw",get_xwxz: "get_xwxz",get_xwxy: "get_xwxy",get_xwxx: "get_xwxx",get_xzww: "get_xzww",get_xzwz: "get_xzwz",get_xzwy: "get_xzwy",get_xzwx: "get_xzwx",get_xzzw: "get_xzzw",get_xzzz: "get_xzzz",get_xzzy: "get_xzzy",get_xzzx: "get_xzzx",get_xzyw: "get_xzyw",get_xzyz: "get_xzyz",get_xzyy: "get_xzyy",get_xzyx: "get_xzyx",get_xzxw: "get_xzxw",get_xzxz: "get_xzxz",get_xzxy: "get_xzxy",get_xzxx: "get_xzxx",get_xyww: "get_xyww",get_xywz: "get_xywz",get_xywy: "get_xywy",get_xywx: "get_xywx",get_xyzw: "get_xyzw",get_xyzz: "get_xyzz",get_xyzy: "get_xyzy",get_xyzx: "get_xyzx",get_xyyw: "get_xyyw",get_xyyz: "get_xyyz",get_xyyy: "get_xyyy",get_xyyx: "get_xyyx",get_xyxw: "get_xyxw",get_xyxz: "get_xyxz",get_xyxy: "get_xyxy",get_xyxx: "get_xyxx",get_xxww: "get_xxww",get_xxwz: "get_xxwz",get_xxwy: "get_xxwy",get_xxwx: "get_xxwx",get_xxzw: "get_xxzw",get_xxzz: "get_xxzz",get_xxzy: "get_xxzy",get_xxzx: "get_xxzx",get_xxyw: "get_xxyw",get_xxyz: "get_xxyz",get_xxyy: "get_xxyy",get_xxyx: "get_xxyx",get_xxxw: "get_xxxw",get_xxxz: "get_xxxz",get_xxxy: "get_xxxy",get_xxxx: "get_xxxx",get_www: "get_www",get_wwz: "get_wwz",get_wwy: "get_wwy",get_wwx: "get_wwx",get_wzw: "get_wzw",get_wzz: "get_wzz",get_wzy: "get_wzy",get_wzx: "get_wzx",get_wyw: "get_wyw",get_wyz: "get_wyz",get_wyy: "get_wyy",get_wyx: "get_wyx",get_wxw: "get_wxw",get_wxz: "get_wxz",get_wxy: "get_wxy",get_wxx: "get_wxx",get_zww: "get_zww",get_zwz: "get_zwz",get_zwy: "get_zwy",get_zwx: "get_zwx",get_zzw: "get_zzw",get_zzz: "get_zzz",get_zzy: "get_zzy",get_zzx: "get_zzx",get_zyw: "get_zyw",get_zyz: "get_zyz",get_zyy: "get_zyy",get_zyx: "get_zyx",get_zxw: "get_zxw",get_zxz: "get_zxz",get_zxy: "get_zxy",get_zxx: "get_zxx",get_yww: "get_yww",get_ywz: "get_ywz",get_ywy: "get_ywy",get_ywx: "get_ywx",get_yzw: "get_yzw",get_yzz: "get_yzz",get_yzy: "get_yzy",get_yzx: "get_yzx",get_yyw: "get_yyw",get_yyz: "get_yyz",get_yyy: "get_yyy",get_yyx: "get_yyx",get_yxw: "get_yxw",get_yxz: "get_yxz",get_yxy: "get_yxy",get_yxx: "get_yxx",get_xww: "get_xww",get_xwz: "get_xwz",get_xwy: "get_xwy",get_xwx: "get_xwx",get_xzw: "get_xzw",get_xzz: "get_xzz",get_xzy: "get_xzy",get_xzx: "get_xzx",get_xyw: "get_xyw",get_xyz: "get_xyz",get_xyy: "get_xyy",get_xyx: "get_xyx",get_xxw: "get_xxw",get_xxz: "get_xxz",get_xxy: "get_xxy",get_xxx: "get_xxx",get_ww: "get_ww",get_wz: "get_wz",get_wy: "get_wy",get_wx: "get_wx",get_zw: "get_zw",get_zz: "get_zz",get_zy: "get_zy",get_zx: "get_zx",get_yw: "get_yw",get_yz: "get_yz",get_yy: "get_yy",get_yx: "get_yx",get_xw: "get_xw",get_xz: "get_xz",get_xy: "get_xy",get_xx: "get_xx",set_w: "set_w",get_w: "get_w",set_z: "set_z",get_z: "get_z",set_y: "set_y",get_y: "get_y",set_x: "set_x",get_x: "get_x"};
 class zero_utilities__$Color_Color_$Impl_$ {
 	static zero(n) {
 		if(Math.abs(n) <= zero_utilities__$Color_Color_$Impl_$.epsilon) {
@@ -4330,7 +3939,6 @@ class zero_utilities__$Color_Color_$Impl_$ {
 	}
 }
 zero_utilities__$Color_Color_$Impl_$.__name__ = true;
-zero_utilities__$Color_Color_$Impl_$.__properties__ = {get_aaaa: "get_aaaa",get_aaab: "get_aaab",get_aaag: "get_aaag",get_aaar: "get_aaar",get_aaba: "get_aaba",get_aabb: "get_aabb",get_aabg: "get_aabg",get_aabr: "get_aabr",get_aaga: "get_aaga",get_aagb: "get_aagb",get_aagg: "get_aagg",get_aagr: "get_aagr",get_aara: "get_aara",get_aarb: "get_aarb",get_aarg: "get_aarg",get_aarr: "get_aarr",get_abaa: "get_abaa",get_abab: "get_abab",get_abag: "get_abag",get_abar: "get_abar",get_abba: "get_abba",get_abbb: "get_abbb",get_abbg: "get_abbg",get_abbr: "get_abbr",get_abga: "get_abga",get_abgb: "get_abgb",get_abgg: "get_abgg",get_abgr: "get_abgr",get_abra: "get_abra",get_abrb: "get_abrb",get_abrg: "get_abrg",get_abrr: "get_abrr",get_agaa: "get_agaa",get_agab: "get_agab",get_agag: "get_agag",get_agar: "get_agar",get_agba: "get_agba",get_agbb: "get_agbb",get_agbg: "get_agbg",get_agbr: "get_agbr",get_agga: "get_agga",get_aggb: "get_aggb",get_aggg: "get_aggg",get_aggr: "get_aggr",get_agra: "get_agra",get_agrb: "get_agrb",get_agrg: "get_agrg",get_agrr: "get_agrr",get_araa: "get_araa",get_arab: "get_arab",get_arag: "get_arag",get_arar: "get_arar",get_arba: "get_arba",get_arbb: "get_arbb",get_arbg: "get_arbg",get_arbr: "get_arbr",get_arga: "get_arga",get_argb: "get_argb",get_argg: "get_argg",get_argr: "get_argr",get_arra: "get_arra",get_arrb: "get_arrb",get_arrg: "get_arrg",get_arrr: "get_arrr",get_baaa: "get_baaa",get_baab: "get_baab",get_baag: "get_baag",get_baar: "get_baar",get_baba: "get_baba",get_babb: "get_babb",get_babg: "get_babg",get_babr: "get_babr",get_baga: "get_baga",get_bagb: "get_bagb",get_bagg: "get_bagg",get_bagr: "get_bagr",get_bara: "get_bara",get_barb: "get_barb",get_barg: "get_barg",get_barr: "get_barr",get_bbaa: "get_bbaa",get_bbab: "get_bbab",get_bbag: "get_bbag",get_bbar: "get_bbar",get_bbba: "get_bbba",get_bbbb: "get_bbbb",get_bbbg: "get_bbbg",get_bbbr: "get_bbbr",get_bbga: "get_bbga",get_bbgb: "get_bbgb",get_bbgg: "get_bbgg",get_bbgr: "get_bbgr",get_bbra: "get_bbra",get_bbrb: "get_bbrb",get_bbrg: "get_bbrg",get_bbrr: "get_bbrr",get_bgaa: "get_bgaa",get_bgab: "get_bgab",get_bgag: "get_bgag",get_bgar: "get_bgar",get_bgba: "get_bgba",get_bgbb: "get_bgbb",get_bgbg: "get_bgbg",get_bgbr: "get_bgbr",get_bgga: "get_bgga",get_bggb: "get_bggb",get_bggg: "get_bggg",get_bggr: "get_bggr",get_bgra: "get_bgra",get_bgrb: "get_bgrb",get_bgrg: "get_bgrg",get_bgrr: "get_bgrr",get_braa: "get_braa",get_brab: "get_brab",get_brag: "get_brag",get_brar: "get_brar",get_brba: "get_brba",get_brbb: "get_brbb",get_brbg: "get_brbg",get_brbr: "get_brbr",get_brga: "get_brga",get_brgb: "get_brgb",get_brgg: "get_brgg",get_brgr: "get_brgr",get_brra: "get_brra",get_brrb: "get_brrb",get_brrg: "get_brrg",get_brrr: "get_brrr",get_gaaa: "get_gaaa",get_gaab: "get_gaab",get_gaag: "get_gaag",get_gaar: "get_gaar",get_gaba: "get_gaba",get_gabb: "get_gabb",get_gabg: "get_gabg",get_gabr: "get_gabr",get_gaga: "get_gaga",get_gagb: "get_gagb",get_gagg: "get_gagg",get_gagr: "get_gagr",get_gara: "get_gara",get_garb: "get_garb",get_garg: "get_garg",get_garr: "get_garr",get_gbaa: "get_gbaa",get_gbab: "get_gbab",get_gbag: "get_gbag",get_gbar: "get_gbar",get_gbba: "get_gbba",get_gbbb: "get_gbbb",get_gbbg: "get_gbbg",get_gbbr: "get_gbbr",get_gbga: "get_gbga",get_gbgb: "get_gbgb",get_gbgg: "get_gbgg",get_gbgr: "get_gbgr",get_gbra: "get_gbra",get_gbrb: "get_gbrb",get_gbrg: "get_gbrg",get_gbrr: "get_gbrr",get_ggaa: "get_ggaa",get_ggab: "get_ggab",get_ggag: "get_ggag",get_ggar: "get_ggar",get_ggba: "get_ggba",get_ggbb: "get_ggbb",get_ggbg: "get_ggbg",get_ggbr: "get_ggbr",get_ggga: "get_ggga",get_gggb: "get_gggb",get_gggg: "get_gggg",get_gggr: "get_gggr",get_ggra: "get_ggra",get_ggrb: "get_ggrb",get_ggrg: "get_ggrg",get_ggrr: "get_ggrr",get_graa: "get_graa",get_grab: "get_grab",get_grag: "get_grag",get_grar: "get_grar",get_grba: "get_grba",get_grbb: "get_grbb",get_grbg: "get_grbg",get_grbr: "get_grbr",get_grga: "get_grga",get_grgb: "get_grgb",get_grgg: "get_grgg",get_grgr: "get_grgr",get_grra: "get_grra",get_grrb: "get_grrb",get_grrg: "get_grrg",get_grrr: "get_grrr",get_raaa: "get_raaa",get_raab: "get_raab",get_raag: "get_raag",get_raar: "get_raar",get_raba: "get_raba",get_rabb: "get_rabb",get_rabg: "get_rabg",get_rabr: "get_rabr",get_raga: "get_raga",get_ragb: "get_ragb",get_ragg: "get_ragg",get_ragr: "get_ragr",get_rara: "get_rara",get_rarb: "get_rarb",get_rarg: "get_rarg",get_rarr: "get_rarr",get_rbaa: "get_rbaa",get_rbab: "get_rbab",get_rbag: "get_rbag",get_rbar: "get_rbar",get_rbba: "get_rbba",get_rbbb: "get_rbbb",get_rbbg: "get_rbbg",get_rbbr: "get_rbbr",get_rbga: "get_rbga",get_rbgb: "get_rbgb",get_rbgg: "get_rbgg",get_rbgr: "get_rbgr",get_rbra: "get_rbra",get_rbrb: "get_rbrb",get_rbrg: "get_rbrg",get_rbrr: "get_rbrr",get_rgaa: "get_rgaa",get_rgab: "get_rgab",get_rgag: "get_rgag",get_rgar: "get_rgar",get_rgba: "get_rgba",get_rgbb: "get_rgbb",get_rgbg: "get_rgbg",get_rgbr: "get_rgbr",get_rgga: "get_rgga",get_rggb: "get_rggb",get_rggg: "get_rggg",get_rggr: "get_rggr",get_rgra: "get_rgra",get_rgrb: "get_rgrb",get_rgrg: "get_rgrg",get_rgrr: "get_rgrr",get_rraa: "get_rraa",get_rrab: "get_rrab",get_rrag: "get_rrag",get_rrar: "get_rrar",get_rrba: "get_rrba",get_rrbb: "get_rrbb",get_rrbg: "get_rrbg",get_rrbr: "get_rrbr",get_rrga: "get_rrga",get_rrgb: "get_rrgb",get_rrgg: "get_rrgg",get_rrgr: "get_rrgr",get_rrra: "get_rrra",get_rrrb: "get_rrrb",get_rrrg: "get_rrrg",get_rrrr: "get_rrrr",get_bbb: "get_bbb",get_bbg: "get_bbg",get_bbr: "get_bbr",get_bgb: "get_bgb",get_bgg: "get_bgg",get_bgr: "get_bgr",get_brb: "get_brb",get_brg: "get_brg",get_brr: "get_brr",get_gbb: "get_gbb",get_gbg: "get_gbg",get_gbr: "get_gbr",get_ggb: "get_ggb",get_ggg: "get_ggg",get_ggr: "get_ggr",get_grb: "get_grb",get_grg: "get_grg",get_grr: "get_grr",get_rbb: "get_rbb",get_rbg: "get_rbg",get_rbr: "get_rbr",get_rgb: "get_rgb",get_rgg: "get_rgg",get_rgr: "get_rgr",get_rrb: "get_rrb",get_rrg: "get_rrg",get_rrr: "get_rrr",set_brightness: "set_brightness",get_brightness: "get_brightness",set_lightness: "set_lightness",get_lightness: "get_lightness",set_saturation: "set_saturation",get_saturation: "get_saturation",set_hue: "set_hue",get_hue: "get_hue",set_alpha_int: "set_alpha_int",get_alpha_int: "get_alpha_int",set_blue_int: "set_blue_int",get_blue_int: "get_blue_int",set_green_int: "set_green_int",get_green_int: "get_green_int",set_red_int: "set_red_int",get_red_int: "get_red_int",set_alpha: "set_alpha",get_alpha: "get_alpha",set_blue: "set_blue",get_blue: "get_blue",set_green: "set_green",get_green: "get_green",set_red: "set_red",get_red: "get_red"};
 class zero_utilities__$Vec2_Vec2_$Impl_$ {
 	static zero(n) {
 		if(Math.abs(n) <= zero_utilities__$Vec2_Vec2_$Impl_$.epsilon) {
@@ -4667,7 +4275,6 @@ class zero_utilities__$Vec2_Vec2_$Impl_$ {
 	}
 }
 zero_utilities__$Vec2_Vec2_$Impl_$.__name__ = true;
-zero_utilities__$Vec2_Vec2_$Impl_$.__properties__ = {get_yyyy: "get_yyyy",get_yyyx: "get_yyyx",get_yyxy: "get_yyxy",get_yyxx: "get_yyxx",get_yxyy: "get_yxyy",get_yxyx: "get_yxyx",get_yxxy: "get_yxxy",get_yxxx: "get_yxxx",get_xyyy: "get_xyyy",get_xyyx: "get_xyyx",get_xyxy: "get_xyxy",get_xyxx: "get_xyxx",get_xxyy: "get_xxyy",get_xxyx: "get_xxyx",get_xxxy: "get_xxxy",get_xxxx: "get_xxxx",get_yyy: "get_yyy",get_yyx: "get_yyx",get_yxy: "get_yxy",get_yxx: "get_yxx",get_xyy: "get_xyy",get_xyx: "get_xyx",get_xxy: "get_xxy",get_xxx: "get_xxx",get_yy: "get_yy",get_yx: "get_yx",get_xy: "get_xy",get_xx: "get_xx",set_radians: "set_radians",get_radians: "get_radians",set_angle: "set_angle",get_angle: "get_angle",set_length: "set_length",get_length: "get_length",set_y: "set_y",get_y: "get_y",set_x: "set_x",get_x: "get_x"};
 class zero_utilities__$Vec3_Vec3_$Impl_$ {
 	static zero(n) {
 		if(Math.abs(n) <= zero_utilities__$Vec3_Vec3_$Impl_$.epsilon) {
@@ -5287,32 +4894,16 @@ class zero_utilities__$Vec3_Vec3_$Impl_$ {
 	}
 }
 zero_utilities__$Vec3_Vec3_$Impl_$.__name__ = true;
-zero_utilities__$Vec3_Vec3_$Impl_$.__properties__ = {get_zzzz: "get_zzzz",get_zzzy: "get_zzzy",get_zzzx: "get_zzzx",get_zzyz: "get_zzyz",get_zzyy: "get_zzyy",get_zzyx: "get_zzyx",get_zzxz: "get_zzxz",get_zzxy: "get_zzxy",get_zzxx: "get_zzxx",get_zyzz: "get_zyzz",get_zyzy: "get_zyzy",get_zyzx: "get_zyzx",get_zyyz: "get_zyyz",get_zyyy: "get_zyyy",get_zyyx: "get_zyyx",get_zyxz: "get_zyxz",get_zyxy: "get_zyxy",get_zyxx: "get_zyxx",get_zxzz: "get_zxzz",get_zxzy: "get_zxzy",get_zxzx: "get_zxzx",get_zxyz: "get_zxyz",get_zxyy: "get_zxyy",get_zxyx: "get_zxyx",get_zxxz: "get_zxxz",get_zxxy: "get_zxxy",get_zxxx: "get_zxxx",get_yzzz: "get_yzzz",get_yzzy: "get_yzzy",get_yzzx: "get_yzzx",get_yzyz: "get_yzyz",get_yzyy: "get_yzyy",get_yzyx: "get_yzyx",get_yzxz: "get_yzxz",get_yzxy: "get_yzxy",get_yzxx: "get_yzxx",get_yyzz: "get_yyzz",get_yyzy: "get_yyzy",get_yyzx: "get_yyzx",get_yyyz: "get_yyyz",get_yyyy: "get_yyyy",get_yyyx: "get_yyyx",get_yyxz: "get_yyxz",get_yyxy: "get_yyxy",get_yyxx: "get_yyxx",get_yxzz: "get_yxzz",get_yxzy: "get_yxzy",get_yxzx: "get_yxzx",get_yxyz: "get_yxyz",get_yxyy: "get_yxyy",get_yxyx: "get_yxyx",get_yxxz: "get_yxxz",get_yxxy: "get_yxxy",get_yxxx: "get_yxxx",get_xzzz: "get_xzzz",get_xzzy: "get_xzzy",get_xzzx: "get_xzzx",get_xzyz: "get_xzyz",get_xzyy: "get_xzyy",get_xzyx: "get_xzyx",get_xzxz: "get_xzxz",get_xzxy: "get_xzxy",get_xzxx: "get_xzxx",get_xyzz: "get_xyzz",get_xyzy: "get_xyzy",get_xyzx: "get_xyzx",get_xyyz: "get_xyyz",get_xyyy: "get_xyyy",get_xyyx: "get_xyyx",get_xyxz: "get_xyxz",get_xyxy: "get_xyxy",get_xyxx: "get_xyxx",get_xxzz: "get_xxzz",get_xxzy: "get_xxzy",get_xxzx: "get_xxzx",get_xxyz: "get_xxyz",get_xxyy: "get_xxyy",get_xxyx: "get_xxyx",get_xxxz: "get_xxxz",get_xxxy: "get_xxxy",get_xxxx: "get_xxxx",get_zzz: "get_zzz",get_zzy: "get_zzy",get_zzx: "get_zzx",get_zyz: "get_zyz",get_zyy: "get_zyy",get_zyx: "get_zyx",get_zxz: "get_zxz",get_zxy: "get_zxy",get_zxx: "get_zxx",get_yzz: "get_yzz",get_yzy: "get_yzy",get_yzx: "get_yzx",get_yyz: "get_yyz",get_yyy: "get_yyy",get_yyx: "get_yyx",get_yxz: "get_yxz",get_yxy: "get_yxy",get_yxx: "get_yxx",get_xzz: "get_xzz",get_xzy: "get_xzy",get_xzx: "get_xzx",get_xyz: "get_xyz",get_xyy: "get_xyy",get_xyx: "get_xyx",get_xxz: "get_xxz",get_xxy: "get_xxy",get_xxx: "get_xxx",get_zz: "get_zz",get_zy: "get_zy",get_zx: "get_zx",get_yz: "get_yz",get_yy: "get_yy",get_yx: "get_yx",get_xz: "get_xz",get_xy: "get_xy",get_xx: "get_xx",set_length: "set_length",get_length: "get_length",set_z: "set_z",get_z: "get_z",set_y: "set_y",get_y: "get_y",set_x: "set_x",get_x: "get_x"};
-function $getIterator(o) { if( o instanceof Array ) return HxOverrides.iter(o); else return o.iterator(); }
-function $bind(o,m) { if( m == null ) return null; if( m.__id__ == null ) m.__id__ = $global.$haxeUID++; var f; if( o.hx__closures__ == null ) o.hx__closures__ = {}; else f = o.hx__closures__[m.__id__]; if( f == null ) { f = m.bind(o); o.hx__closures__[m.__id__] = f; } return f; }
-$global.$haxeUID |= 0;
-if( String.fromCodePoint == null ) String.fromCodePoint = function(c) { return c < 0x10000 ? String.fromCharCode(c) : String.fromCharCode((c>>10)+0xD7C0)+String.fromCharCode((c&0x3FF)+0xDC00); }
-String.prototype.__class__ = String;
 String.__name__ = true;
 Array.__name__ = true;
-Date.prototype.__class__ = Date;
 Date.__name__ = "Date";
-var Int = { };
-var Dynamic = { };
-var Float = Number;
-var Bool = Boolean;
-var Class = { };
-var Enum = { };
 var __map_reserved = {};
 Object.defineProperty(js__$Boot_HaxeError.prototype,"message",{ get : function() {
 	return String(this.val);
 }});
 js_Boot.__toStr = ({ }).toString;
-io_colyseus_serializer_schema_SPEC.END_OF_STRUCTURE = 193;
-io_colyseus_serializer_schema_SPEC.NIL = 192;
-io_colyseus_serializer_schema_SPEC.INDEX_CHANGE = 212;
-io_colyseus_serializer_schema_Schema._hx_skip_constructor = false;
-io_colyseus_serializer_schema_Schema.decoder = new io_colyseus_serializer_schema_Decoder();
+zero_utilities__$IntPoint_IntPoint_$Impl_$.pool = [];
+Util.directions = [zero_utilities__$IntPoint_IntPoint_$Impl_$.get(1,0),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(1,1),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(0,1),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(-1,1),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(-1,0),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(-1,-1),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(0,-1),zero_utilities__$IntPoint_IntPoint_$Impl_$.get(1,-1)];
 zero_utilities__$Vec4_Vec4_$Impl_$.epsilon = 1e-8;
 zero_utilities__$Vec4_Vec4_$Impl_$.pool = [];
 zero_utilities__$Color_Color_$Impl_$.RED = zero_utilities__$Color_Color_$Impl_$.from_array_int([1,0,0,1]);
@@ -5352,6 +4943,6 @@ zero_utilities__$Vec2_Vec2_$Impl_$.epsilon = 1e-8;
 zero_utilities__$Vec2_Vec2_$Impl_$.pool = [];
 zero_utilities__$Vec3_Vec3_$Impl_$.epsilon = 1e-8;
 zero_utilities__$Vec3_Vec3_$Impl_$.pool = [];
-})(typeof exports != "undefined" ? exports : typeof window != "undefined" ? window : typeof self != "undefined" ? self : this, typeof window != "undefined" ? window : typeof global != "undefined" ? global : typeof self != "undefined" ? self : this);
+})(typeof exports != "undefined" ? exports : typeof window != "undefined" ? window : typeof self != "undefined" ? self : this, {});
 
 //# sourceMappingURL=game.js.map

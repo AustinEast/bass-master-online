@@ -1,11 +1,14 @@
 package objects;
 
-class Player extends FlxSprite {
+import flixel.math.FlxRandom;
+import flixel.math.FlxMath;
 
-  public function new(x, y, ghost) {
+class Player extends BaseSprite {
+
+  public function new(x, y) {
     super(x, y);
 
-    makeGraphic(32, 32, FlxColor.WHITE);
-		centerOrigin();
+    loadSlices('assets/images/wiz_${Main.random.int(1,5)}.png', 32, 32, 19);
+    centerOrigin();
   }
 }

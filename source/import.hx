@@ -33,3 +33,4 @@ using zero.extensions.StringExt;
 using zero.flixel.extensions.FlxObjectExt;
 using zero.flixel.extensions.FlxPointExt;
 using zero.flixel.extensions.FlxSpriteExt;
+using zero.flixel.extensions.FlxTilemapExt;

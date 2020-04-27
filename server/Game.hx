@@ -1,14 +1,14 @@
 package;
 
-import haxe.Timer;
-import Types;
+import zero.utilities.IntPoint;
 import zero.utilities.Vec2;
-import schema.GameState;
-import schema.Entity;
+import Types;
 
 using Util;
 using Math;
 using zero.extensions.FloatExt;
+using zero.extensions.ArrayExt;
+using zero.utilities.AStar;
 
 @:expose
 class Game {
@@ -17,12 +17,14 @@ class Game {
   final bobber_speed:Float = 400;
   final max_fish:Int = 4;
 
-  var fish_timer:Timer;
+  var map:Array<Array<Int>>;
   var fish_count:Int = 0;
+  var fish_positions:Array<Vec2>;
+  var player_positions:Array<Vec2>;
 
   public function new() { }
 
-  public function process_message(message:Dynamic, entity:Entity, state:Dynamic) {
+  public function process_message(message:Dynamic, entity:Dynamic, state:Dynamic) {
     if (entity == null) return;
 
     if (message.mouse != null) {
@@ -31,7 +33,7 @@ class Game {
       switch (cast message.mouse : MouseInput) {
         case Pressed:
           if (entity.state == cast PlayerState.Aiming) {
-            var angle = mouse.rad_between(pos).rad_to_deg().to_int() - 180;
+            var angle = mouse.rad_between(pos).rad_to_deg().to_int();
             if (entity.rotation != angle) entity.rotation = angle;
           }
         case JustPressed:
@@ -42,12 +44,34 @@ class Game {
 					    entity.rotation = angle;
             }
             else {
-              entity.target_x = mouse.x;
-              entity.target_y = mouse.y;
+              entity.targets.length = 0;
+              var start = IntPoint.get((pos.x / state.world.tile_width).to_int(), (pos.y / state.world.tile_height).to_int());
+              var end = IntPoint.get((mouse.x / state.world.tile_width).to_int(), (mouse.y / state.world.tile_height).to_int());
+              var path = map.get_path({
+                start: start,
+                end: end,
+                passable: [1],
+                mode: DIAGONAL,
+                // simplify: LINE_OF_SIGHT_NO_DIAGONAL
+              });
+              if (path.length > 0) {
+                for (node in path) {
+                  var point = state.createPoint(node.x * state.world.tile_width + state.world.tile_width * 0.5, node.y * state.world.tile_height + state.world.tile_height * 0.5);
+                  entity.targets.push(point);
+                }
+
+                var node = entity.targets.shift();
+                entity.target_x = node.x;
+                entity.target_y = node.y;
+              }
+              else {
+                entity.target_x = mouse.x;
+                entity.target_y = mouse.y;
+              }
             }
           }
           if (entity.state == (cast PlayerState.Fishing) || entity.state == cast PlayerState.Casting) {
-            untyped var bobber = state.entities[entity.child];
+            var bobber = state.entities[entity.child];
             if (bobber != null) {
               entity.state = cast PlayerState.Reeling;
               bobber.target_x = entity.x;
@@ -68,8 +92,8 @@ class Game {
           }
         case JustReleased:
           if (entity.state == cast PlayerState.Aiming) {
-            entity.rotation = mouse.rad_between(pos).rad_to_deg().to_int() - 180;
-            var bobber:Entity = state.createEntity(Util.uuid(), cast EntityType.Bobber);
+            entity.rotation = mouse.rad_between(pos).rad_to_deg().to_int();
+            var bobber = state.createEntity(Util.uuid(), cast EntityType.Bobber);
             bobber.x = entity.x;
             bobber.y = entity.y;
             var pos = Vec2.get(entity.x, entity.y);
@@ -90,25 +114,23 @@ class Game {
   }
 
   public function update(dt:Float, state:Dynamic) {
-    var arr:Array<Entity> = state.entityArray();
-    for (entity in arr) {
-      if (entity.timer > 0) entity.timer -= dt;
+    state.forEachEntity((entity) -> {
+      if (entity.timer > 0.) entity.timer -= dt;
 
       var entity_pos = Vec2.get(entity.x, entity.y);
 
       switch (cast entity.type: EntityType) {
         case Player:
           if (entity.state == cast PlayerState.Idle)
-            move_entity_to_target(dt, entity);
+            move_entity_to_target(dt, entity, state);
         case Fish:
           switch (cast entity.state : FishState) {
             case Idle:
-              if (move_entity_to_target(dt, entity) && entity.timer < 0) {
+              if (move_entity_to_target(dt, entity, state) && entity.timer < 0) {
                 var found = false;
 
-                var arr:Array<Entity> = state.entityArray();
-                for (bobber in arr) {
-                  if (bobber.type != (cast EntityType.Bobber) || bobber.child != null ) continue;
+                state.forEachEntity((bobber) -> {
+                  if (found || bobber.type != (cast EntityType.Bobber) || bobber.child != null ) return;
 
                   var bobber_pos = Vec2.get(bobber.x, bobber.y);
 
@@ -121,49 +143,46 @@ class Game {
                     bobber.child = entity.id;
 
                     found = true;
-
-                    bobber_pos.put();
-
-                    break;
                   }
                   bobber_pos.put();
-                }
+                });
 
-                if (found) {
+                if (!found) {
+                  var i_x = (entity_pos.x / state.world.tile_width).to_int();
+                  var i_y = (entity_pos.y / state.world.tile_height).to_int();
+                  Util.directions.shuffle();      
+                  for (direction in Util.directions) {
+                    if (map.get_xy(i_x + direction.x, i_y + direction.y) == 0) {
+                      entity.target_x = (i_x + direction.x) * state.world.tile_width + state.world.tile_width * 0.5;
+                      entity.target_y = (i_y + direction.y) * state.world.tile_height + state.world.tile_height * 0.5;
+                      break;
+                    }
+                  }
 
-                }
-                else {
-                  entity.target_x = entity.next_target_x;
-                  entity.target_y = entity.next_target_y;
-                  
-                  var vec2 = (Math.random() * 360).vector_from_angle(25);
-                  vec2.x += entity.x;
-                  vec2.y += entity.y;
-                  entity.next_target_x = vec2.x;
-                  entity.next_target_y = vec2.y;
-                  vec2.put();
+                  // var pos = fish_positions[(fish_positions.length - 1).get_random().to_int()];
+                  // entity.target_x = 
 
                   entity.timer = 3 + Math.random() * 5;
                 }
               }
             case Interested:
-              if (move_entity_to_target(dt, entity)) {
-                untyped var bobber = state.entities[entity.parent];
+              if (move_entity_to_target(dt, entity, state)) {
+                var bobber = state.entities[entity.parent];
                 if (bobber != null) {
                   entity.timer = 1;
                   entity.state = cast FishState.Nibbling;
                 }
               }
             case Nibbling:
-              if (move_entity_to_target(dt, entity) && entity.timer < 0) {
+              if (move_entity_to_target(dt, entity, state) && entity.timer < 0) {
                 state.removeEntity(entity.id);
                 fish_count--;
               }
             case Caught:
-              if (move_entity_to_target(dt, entity)) {
+              if (move_entity_to_target(dt, entity, state)) {
                 state.removeEntity(entity.id);
                 fish_count--;
-                untyped var parent = state.entities[entity.parent];
+                var parent = state.entities[entity.parent];
                 if (parent != null) {
                   parent.weight += entity.weight;
                   parent.state = cast PlayerState.Idle;
@@ -171,58 +190,83 @@ class Game {
               }
           }
         case Bobber:
-          untyped var parent = state.entities[entity.parent];
+          var parent = state.entities[entity.parent];
           if (parent == null) {
             state.removeEntity(entity.id);
             return;
           }
 
           if (entity.state == cast BobberState.Idle) {
-            if (move_entity_to_target(dt, entity)) {
+            if (move_entity_to_target(dt, entity, state)) {
               entity.state = cast BobberState.Floating;
               parent.state = cast PlayerState.Fishing;
             }
           }
 
           else if (entity.state == cast BobberState.Reeling) {
-            if (move_entity_to_target(dt, entity)) {
+            if (move_entity_to_target(dt, entity, state)) {
               state.removeEntity(entity.id);
               if (parent.state == cast PlayerState.Reeling)
                 parent.state = cast PlayerState.Idle;
             }
           }
         }
-    }
+    });
   }
 
   public function check_fish(state:Dynamic) {
     // Check if we should spawn fish
     if (fish_count < max_fish) {
+      
+      var pos = fish_positions[(fish_positions.length - 1).get_random().to_int()];
+
       fish_count++;
       var fish = state.createEntity(Util.uuid(), cast EntityType.Fish);
-      fish.x = Math.random() * state.world.width;
-      fish.y = Math.random() * state.world.height;
+      fish.x = pos.x;
+      fish.y = pos.y;
+      fish.rotation = Math.random() * 360;
       fish.target_x = fish.x;
       fish.target_y = fish.y;
       fish.timer = 3 + Math.random() * 3;
       fish.weight = 1 + (Math.random() * 4).to_int();
-      
-      var vec2 = (Math.random() * 360).vector_from_angle(25);
-      vec2.x += fish.x;
-      vec2.y += fish.y;
-      fish.next_target_x = vec2.x;
-      fish.next_target_y = vec2.y;
-      vec2.put();
     }
   }
 
-  function move_entity_to_target(dt:Float, entity:Entity):Bool {
+  public function generate_map(width:Float, height:Float, tile_width:Float, tile_height:Float):Array<Int> {
+    map = Util.generate_map(width, height, tile_width, tile_height);
+    
+    // Generate cached positions
+    fish_positions = [];
+    player_positions = [];
+
+    for (y in 0...map.length) for (x in 0...map[y].length) {
+      var index = map.get_xy(x, y);
+      // Cache possible fish spawn positions
+      if (index == 0 && map.surrounding_tiles_match(index, x, y)) {
+        fish_positions.push(Vec2.get(x * tile_width + tile_width.half(), y * tile_height + tile_height.half()));
+      }
+      // Cache possible player spawn positions
+      else if (index == 1 && map.surrounding_tiles_match(index, x, y)) {
+        player_positions.push(Vec2.get(x * tile_width + tile_width.half(), y * tile_height + tile_height.half()));
+      }
+    } 
+    
+    return map.flatten();
+  }
+
+  public function place_entity(entity:Dynamic) {
+    var pos = player_positions[(player_positions.length - 1).get_random().to_int()];
+    entity.target_x = entity.x = pos.x;
+    entity.target_y = entity.y = pos.y;
+  }
+
+  function move_entity_to_target(dt:Float, entity:Dynamic, state:Dynamic):Bool {
     if (entity == null) return false;
 
     var entity_pos = Vec2.get(entity.x, entity.y);
     var target_pos = Vec2.get(entity.target_x, entity.target_y);
     
-    if (entity_pos.equals(target_pos)) {
+    if (entity_pos.equals(target_pos) && entity.targets.length == 0) {
       entity_pos.put();
       target_pos.put();
       return true;
@@ -230,11 +274,20 @@ class Game {
 
     var distance = entity_pos.distance(target_pos);
     if (distance < 4) {
-      entity.target_x = entity.x;
-      entity.target_y = entity.y;
       entity_pos.put();
       target_pos.put();
-      return true;
+
+      if (entity.targets.length > 0) {
+        var target = entity.targets.shift();
+        entity.target_x = target.x;
+        entity.target_y = target.y;
+        return false;
+      }
+      else {
+        entity.target_x = entity.x;
+        entity.target_y = entity.y;
+        return true;
+      }
     } 
     else {
       var velocity = Vec2.get(0,1);
@@ -259,4 +312,14 @@ class Game {
       return false;
     }
   }
+
+  // if (map.get_xy(x + 1, y) != index) return false;
+    // if (map.get_xy(x + 1, y + 1) != index) return false;
+    // if (map.get_xy(x, y + 1) != index) return false;
+    // if (map.get_xy(x - 1, y + 1) != index) return false;
+    // if (map.get_xy(x - 1, y) != index) return false;
+    // if (map.get_xy(x - 1, y - 1) != index) return false;
+    // if (map.get_xy(x, y - 1) != index) return false;
+    // if (map.get_xy(x + 1, y - 1) != index) return false;
+
 }

@@ -1,10 +1,15 @@
 package objects;
 
-class Fish extends FlxSprite {
+class Fish extends BaseSprite {
   public function new(x, y) {
     super(x, y);
 
-    makeGraphic(24, 24, FlxColor.BLUE);
-		centerOrigin();
+    loadGraphic(Images.fish__png, true, 17, 12);
+    
+    animation.add("wiggle", [0,1,2,3,4,5,6,7], 3);
+    animation.play("wiggle");
+    centerOrigin();
+    
+    z = - 2;
   }
 }

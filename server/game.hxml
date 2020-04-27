@@ -1,5 +1,5 @@
 -cp ./
--cp ../schema
+-cp ../shared
 
 -lib colyseus
 -lib zerolib
