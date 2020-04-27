@@ -1,9 +1,12 @@
 package states;
 
+import zero.utilities.Vec2;
 import objects.*;
 import schema.GameState;
 import zero.flixel.states.sub.SubState;
 import flixel.text.FlxText;
+import flixel.util.FlxTimer;
+import flixel.math.FlxMath;
 
 import io.colyseus.Client;
 import io.colyseus.Room;
@@ -30,40 +33,64 @@ class FishingState extends SubState
 
 	var entities:Map<String,FlxSprite> = [];
 
+	var shadows:FlxGroup;
+	var sorted:FlxTypedGroup<DepthSprite>;
 	var players:FlxTypedGroup<Player>;
 	var fish:FlxTypedGroup<Fish>;
+	var fish_on_top:FlxTypedGroup<Fish>;
 	var bobbers:FlxTypedGroup<Bobber>;
 	var canvas:FlxSprite;
+	var tilemap:DepthTilemap;
+	var aim_timer:FlxTimer;
 
-	var player_state_text:FlxText;
-	var player_weight_text:FlxText;
+	var cursor:DepthSprite;
+	
+	// camera stuff
+	var angle:Float;
+	var last_mouse_x:Float;
+	var lerp:Float = 0.0015;
 
 	override public function create():Void
 	{
 		super.create();
 
+		shadows = new FlxGroup();
+		sorted = new FlxTypedGroup();
 		players = new FlxTypedGroup();
 		fish = new FlxTypedGroup();
+		fish_on_top = new FlxTypedGroup();
 		bobbers = new FlxTypedGroup();
 
 		canvas = new FlxSprite();
-		canvas.makeGraphic(FlxG.width, FlxG.height, FlxColor.TRANSPARENT);
+		canvas.makeGraphic(1,1);
 
-		player_state_text = new FlxText(0,16);
-		player_weight_text = new FlxText(0,32);
+		tilemap = new DepthTilemap();
+		tilemap.slice_offset = 5;
+		tilemap.camera = camera;
+
+		cursor = new DepthSprite();
+		cursor.loadSlices(Images.cursor__png, 13, 13, 7);
 		
+		add(tilemap);
+		add(shadows);
 		add(canvas);
-		add(bobbers);
-		add(players);
-		add(fish);
-		add(player_state_text);
-		add(player_weight_text);
+		add(sorted);
+		// add(fish);
+		// add(bobbers);
+		// add(players);
+		add(cursor);
+
+		camera.setSize(FlxG.width * 2, FlxG.height * 2);
+		camera.setPosition(-FlxG.width.half(), -FlxG.height.half());
+		// camera.bgColor = 0xff45283c;
+		camera.bgColor = 0xfffeb58b;
 
 		init_client();
 	}
 
 	override public function update(elapsed:Float)
 	{
+		canvas.fill(FlxColor.WHITE);
 		canvas.fill(FlxColor.TRANSPARENT);
 
 		input(elapsed);
@@ -72,29 +99,23 @@ class FishingState extends SubState
 
 		sync();
 
-		canvas.endDraw();
+		sorted.sort(sort_by_depth);
 
-		// TEMP UI
-		if (room == null) return;
+		
+
+		if (room == null) {
+			canvas.endDraw();
+			return;
+		}
 
 		var player = room.state.entities.get(room.sessionId);
 		if (player != null) {
-			player_weight_text.text = player.weight.string();
-			player_state_text.text = switch (cast player.state : PlayerState) {
-				case Idle:
-					'Idle';
-				case Aiming:
-					'Aiming';
-				case Casting:
-					'Casting';
-				case Fishing:
-					'Fishing';
-				case Reeling:
-					'Reeling';
-				case Caught:
-					'Caught';
-			}
+			if (!FlxG.mouse.pressed) camera.angle += ((-player.rotation - 90).translate_to_nearest_angle(camera.angle) - camera.angle) * lerp;
+
 		}
+
+		canvas.endDraw();
+		// camera.angle += 20 * elapsed;
 	}
 
 	override function destroy() {
@@ -107,17 +128,19 @@ class FishingState extends SubState
 	}
 
 	function init_client() {
-		#if debug
+		// #if debug
 		client = new Client('ws://localhost:2567');
-		#else
-		client = new Client('wss://fishing-alone-together.herokuapp.com');
-		#end
+		// #else
+		// client = new Client('wss://fishing-alone-together.herokuapp.com');
+		// #end
 
 		client.joinOrCreate("game_room", [], GameState, function(err, room) {
 			if (err != null) {
 					trace("JOIN ERROR: " + err);
 					return;
 			}
+
+			var world = room.state.world;
 	
 			room.state.entities.onAdd = (entity, key) -> {
 					trace("entity added at " + key + " => " + entity);
@@ -127,15 +150,28 @@ class FishingState extends SubState
 						case Player:
 							var player = players.recycle(objects.Player);
 							player.set_midpoint_position(pos);
-							player.color = key == room.sessionId ? FlxColor.LIME : FlxColor.GREEN;
+							player.angle = entity.rotation;
+							// player.color = key == room.sessionId ? FlxColor.LIME : FlxColor.GREEN;
+							player.camera = camera;
+							sorted.add(player);
 							entities.set(entity.id, player);
+
+							if (key == room.sessionId) {
+								camera.follow(player, TOPDOWN_TIGHT, 0.015);
+							}
 						case Fish:
 							var fish = fish.recycle(objects.Fish);
 							fish.set_midpoint_position(pos);
+							fish.angle = entity.rotation;
+							fish.camera = camera;
+							sorted.add(fish);
 							entities.set(entity.id, fish);
 						case Bobber:
 							var bobber = bobbers.recycle(objects.Bobber);
 							bobber.set_midpoint_position(pos);
+							bobber.angle = entity.rotation;
+							bobber.camera = camera;
+							sorted.add(bobber);
 							entities.set(entity.id, bobber);
 					}
 
@@ -159,6 +195,42 @@ class FishingState extends SubState
 						entities.remove(key);
 						sprite.kill();
 					}
+			}
+
+			room.state.world.onChange = (changes) -> {
+				for (change in changes) {
+					if (change.field == 'map') {
+						tilemap.loadDepthMapFromArray((untyped change.value.items), (world.width/world.tile_width).to_int(), (world.height/world.tile_height).to_int(), [
+							{ graphic: Images.grass_tiles__png, slices: 1, auto_tile: AUTO },
+							{ graphic: Images.grass_2_tiles__png, slices: 2, auto_tile: AUTO },
+							{ graphic: Images.dirt_tiles__png, slices: 2, auto_tile: AUTO },
+							{ graphic: Images.dirt_2_tiles__png, slices: 2, auto_tile: AUTO },
+							{ graphic: Images.foam_tiles__png, slices: 1, auto_tile: AUTO },
+							{ graphic: Images.water_tiles__png, slices: 1, auto_tile: OFF, alpha: 0.4, draw_index: 0, use_scale_hack: false },
+							{ graphic: Images.dirt_2_tiles__png, slices: 2, auto_tile: AUTO }
+						], 16, 16);
+
+						canvas.makeGraphic(tilemap.width.to_int(), tilemap.height.to_int(), FlxColor.TRANSPARENT);
+
+						var tiles:Array<Int> = untyped change.value.items;
+
+						// Add trees and rocks
+						for (i in 0...tiles.length) {
+							var tile = tiles[i];
+							if (tile == 2) {
+								var coords = tilemap.getTileCoordsByIndex(i, false);
+								var tree:Tree = cast tilemap.tileToSprite((coords.x / tilemap.get_tile_width()).to_int(), (coords.y / tilemap.get_tile_height()).to_int(), 0, (props) ->  new Tree(coords.x, coords.y));
+								sorted.add(tree);
+								shadows.add(tree.shadow);
+							}
+							else if (tile == 3) {
+								var coords = tilemap.getTileCoordsByIndex(i, false);
+								var rock:Rock = cast tilemap.tileToSprite((coords.x / tilemap.get_tile_width()).to_int(), (coords.y / tilemap.get_tile_height()).to_int(), 1, (props) ->  new Rock(coords.x, coords.y));
+								sorted.add(rock);
+							}
+						}
+					}
+				}
 			}
 
 			this.room = room;
@@ -186,13 +258,40 @@ class FishingState extends SubState
 	function input(dt:Float) {
 		if (room == null) return;
 
+		var player = room.state.entities.get(room.sessionId);
+
 		var mouse = FlxG.mouse.getWorldPosition();
+		var p = FlxPoint.get(camera.scroll.x + camera.width.half(), camera.scroll.y + camera.height.half());
+		mouse.rotate(p, -camera.angle);
+		p.put();
+
+		cursor.set_midpoint_position(mouse);
+
+		var mouse_in_bounds = tilemap.overlapsPoint(mouse);
+		var mouse_index = 0;
+
+		if (mouse_in_bounds) {
+			mouse_index = tilemap.get_index_from_point(mouse);
+		}
+
+		var mouse_active = mouse_index != 0;
+		var mouse_on_player = false;
+		if ( player != null) {
+			var pos = Vec2.get(player.x, player.y);
+			var mouse_vec = mouse.to_vector();
+			if (Util.in_circle(pos, mouse_vec, 16)) mouse_on_player = true;
+			pos.put();
+			mouse_vec.put();
+		}
+
+		if (mouse_on_player || (player != null && player.state == cast PlayerState.Fishing)) cursor.color = 0xff57c52b;
+		else if (mouse_active) cursor.color = FlxColor.WHITE;
+		else cursor.color = 0xffef1b3b;
 		
 		// The left mouse button is currently pressed
 		if (FlxG.mouse.pressed) {
 			room.send({ mouse: cast Pressed, x: mouse.x, y: mouse.y });
 
-			var player = room.state.entities.get(room.sessionId);
 			if (player != null && player.state == cast PlayerState.Aiming) {
 				var pos = FlxPoint.get(player.x, player.y);
 				var angle = pos.get_angle_between(mouse);
@@ -209,12 +308,18 @@ class FishingState extends SubState
 
 		// The left mouse button has just been pressed
 		if (FlxG.mouse.justPressed) {
-			room.send({ mouse: cast JustPressed, x: mouse.x, y: mouse.y });
+			
+			if (mouse_active) room.send({ mouse: cast JustPressed, x: mouse.x, y: mouse.y });
+			
+			if (aim_timer != null) aim_timer.cancel();
+			aim_timer = new FlxTimer().start(0.1, (timer) -> {});
 		}
 
 		// The left mouse button has just been released
 		if (FlxG.mouse.justReleased) {
 			room.send({ mouse: cast JustReleased, x: mouse.x, y: mouse.y });
+			
+			if (aim_timer != null) aim_timer.cancel();
 		}
 
 		mouse.put();
@@ -305,19 +410,21 @@ class FishingState extends SubState
 		}
 	}
 
-	public function draw_line(v1:FlxPoint, v2:FlxPoint, ?color:FlxColor) {
+	/**
+	 * Sorting function that compares the depth of each sprite.
+	 * Check out the `get_depth` function in `DepthSprite` to see how it works.
+	 */
+	function sort_by_depth(o:Int, s1:DepthSprite, s2:DepthSprite):Int 
+    {	
+      var s1d = s1.depth;
+      var s2d = s2.depth;
+      if (FlxMath.equal(s1d, s2d)) return s1.z < s2.z ? 1 : -1;
+      return s1d > s2d ? 1 : -1;
+    }
+
+	function draw_line(v1:FlxPoint, v2:FlxPoint, ?color:FlxColor) {
     canvas.drawCircle(v1.x, v1.y, 4);
     canvas.drawCircle(v2.x, v2.y, 4);
 		canvas.draw_dashed_line(v1, v2, (v1.distance(v2).abs()/6).int(), color);
 	}
-	
-	// public function draw_line(o1:FlxObject, o2:FlxObject) {
-  //   var mid1 = o1.getMidpoint();
-  //   var mid2 = o2.getMidpoint();
-  //   canvas.drawCircle(mid1.x, mid1.y, 4);
-  //   canvas.drawCircle(mid2.x, mid2.y, 4);
-  //   canvas.draw_dashed_line(mid1, mid2, (mid1.distance(mid2).abs()/6).int());
-  //   mid1.put();
-  //   mid2.put();
-  // }
 }

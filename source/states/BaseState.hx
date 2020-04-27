@@ -4,12 +4,6 @@ import states.FishingState;
 
 class BaseState extends State
 {
-
-	public function new()
-	{
-		super(true, false);
-	}
-
 	override public function create()
 	{
 		super.create();

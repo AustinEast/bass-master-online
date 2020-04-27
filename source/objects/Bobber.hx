@@ -1,6 +1,6 @@
 package objects;
 
-class Bobber extends FlxSprite {
+class Bobber extends BaseSprite {
   
   var start:FlxPoint;
 
@@ -8,7 +8,7 @@ class Bobber extends FlxSprite {
     super(x, y);
     start = FlxPoint.get(x, y);
 
-    makeGraphic(8,8, FlxColor.RED);
+    loadSlices(Images.bobber__png, 8, 8, 6);
 		centerOrigin();
   }
 }

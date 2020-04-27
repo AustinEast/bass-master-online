@@ -8,7 +8,7 @@
 
 	<!-- ____________________________ Window Settings ___________________________ -->
 
-	<window width="640" height="480" fps="60" background="#000000" hardware="true" vsync="false" />
+	<window width="640" height="640" fps="60" background="#000000" hardware="true" vsync="false" />
 	<!-- <window if="html5" resizable="false" /> -->
 	<window if="desktop" orientation="landscape" fullscreen="false" resizable="true" />
 	<window if="mobile" orientation="landscape" fullscreen="true" width="0" height="0" />
@@ -18,8 +18,7 @@
 	<set name="BUILD_DIR" value="debug" if='debug' />
 	<set name="BUILD_DIR" value="release" unless='debug' />
 	<classpath name="source" />
-	<classpath name="game" />
-	<classpath name="schema" />
+	<classpath name="shared" />
 	<assets path="assets" />
 
 	<!-- _______________________________ Libraries ______________________________ -->

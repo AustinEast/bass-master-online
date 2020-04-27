@@ -1,0 +1,13 @@
+-cp .
+-cp ../shared
+
+-main Main
+-dce full
+
+-D js-es=6
+
+-lib colyseus-hxjs
+-lib hxnodejs
+-lib zerolib
+
+-js server.js

@@ -8,4 +8,8 @@ export class Game {
   update(dt:number, state:any):void;
 
   check_fish(state:any):void;
+
+  generate_map(width:number, height:number, tile_width:number, tile_height:number):Array<number>;
+
+  place_entity(entity:Entity):void;
 }

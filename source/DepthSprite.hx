@@ -1,4 +1,4 @@
-package util;
+package;
 
 import openfl.geom.ColorTransform;
 import flixel.math.FlxMath;
@@ -20,9 +20,12 @@ class DepthSprite extends FlxSprite
   /**
 	 * All DepthSprites in this list.
 	 */
-	public var children(default, null):Array<DepthSprite> = [];
   public var slices:Array<DepthSprite> = [];
-  public var rotation(default, set):Float;
+	public var rotation(default, set):Float;
+	/**
+   * The Entity's Rotation relative to the camera.
+   */
+	 public var relative_rotation(get, set):Float;
   /**
    *  The Entity's depth in relation to the camera angle
    */
@@ -30,59 +33,26 @@ class DepthSprite extends FlxSprite
   /**
    * Simulated position of the sprite on the Z axis.
    */
-  public var z:Float;
-	public var velocityZ:Float;
+	public var z:Float;
+
+	public var local_x:Float;
+
+	public var local_y:Float;
+	/**
+   * Simulated position of the sprite on the Z axis, relative to the sprite's parent
+   */
+	public var local_z:Float;
+
+	public var local_angle:Float;
   /**
    * Used to set whether the Sprite "billboards",
    * or that the Sprite's angle will always remain opposite of the Camera's
    */
   public var billboard(default, set):Bool;
   /**
-   * A `relative_` var for this sprite's children's z.
-   */
-  public var relativeZ:Float;
-  /**
-   * The Entity's Rotation relative to the camera.
-   */
-  public var relative_rotation(get, set):Float;
-  /**
-	 * X position of this sprite relative to parent, 0 by default
-	 */
-	public var relativeX:Float = 0;
-	/**
-	 * Y position of this sprite relative to parent, 0 by default
-	 */
-	public var relativeY:Float = 0;
-	/**
-	 * Angle of this sprite relative to parent
-	 */
-	public var relativeAngle:Float = 0;
-	/**
-	 * Angular velocity relative to parent sprite
-	 */
-	public var relativeAngularVelocity:Float = 0;
-	/**
-	 * Angular acceleration relative to parent sprite
-	 */
-	public var relativeAngularAcceleration:Float = 0;
-	
-	public var relativeAlpha:Float = 1;
-	/**
-	 * Scale of this sprite relative to parent
-	 */
-	public var relativeScale(default, null):FlxPoint = FlxPoint.get(1, 1);
-	/**
-	 * Velocity relative to parent sprite
-	 */
-	public var relativeVelocity(default, null):FlxPoint = FlxPoint.get();
-	/**
-	 * Acceleration relative to parent sprite
-	 */
-	public var relativeAcceleration(default, null):FlxPoint = FlxPoint.get();
-  /**
    * Offset of each 3D "Slice"
    */
-  public var slice_offset:Int = 1;
+  public var slice_offset:Float = 1;
   /**
 	 * Amount of Graphics in this list.
 	 */
@@ -105,170 +75,92 @@ class DepthSprite extends FlxSprite
 	override public function destroy():Void
 	{
 		super.destroy();
-		
-		relativeScale = FlxDestroyUtil.put(relativeScale);
-		relativeVelocity = FlxDestroyUtil.put(relativeVelocity);
-		relativeAcceleration = FlxDestroyUtil.put(relativeAcceleration);
-		children = FlxDestroyUtil.destroyArray(children);
+
     slices = FlxDestroyUtil.destroyArray(slices);
 	}
-  /**
-	 * Adds the DepthSprite to the children list.
+
+	/**
+	 * Adds the DepthSprite to the slices list.
 	 * 
-	 * @param	child	The DepthSprite to add.
+	 * @param	slice	The DepthSprite to add.
 	 * @return	The added DepthSprite.
 	 */
-  public function add(child:DepthSprite):DepthSprite {
-    if (children.contains(child)) return child;
+	 public function add_slice(slice:DepthSprite):DepthSprite {
+    if (slices.contains(slice)) return slice;
 		
-		children.push(child);
-		child.velocity.set(0, 0);
-		child.acceleration.set(0, 0);
-		child.scrollFactor.copyFrom(scrollFactor);
+		slices.push(slice);
+		slice.velocity.set(0, 0);
+		slice.acceleration.set(0, 0);
+		slice.scrollFactor.copyFrom(scrollFactor);
 		
-		child.alpha = child.relativeAlpha * alpha;
-		child._parentRed = color.redFloat;
-		child._parentGreen = color.greenFloat;
-		child._parentBlue = color.blueFloat;
-		child.color = child.color;
+		slice.alpha = alpha;
+		slice._parentRed = color.redFloat;
+		slice._parentGreen = color.greenFloat;
+		slice._parentBlue = color.blueFloat;
+		slice.color = slice.color;
 
-    return child;
+    return slice;
   }
 
   /**
-	 * Removes the DepthSprite from the children list.
+	 * Removes the DepthSprite from the slices list.
 	 * 
-	 * @param	child	The DepthSprite to remove.
+	 * @param	slice	The DepthSprite to remove.
 	 * @return	The removed DepthSprite.
 	 */
-	public function remove(child:DepthSprite):DepthSprite
+	public function remove_slice(slice:DepthSprite):DepthSprite
 	{
-		var index:Int = children.indexOf(child);
-		if (index >= 0) children.splice(index, 1);
-		index = slices.indexOf(child);
+		var index:Int = slices.indexOf(slice);
+		if (index >= 0) slices.splice(index, 1);
+		index = slices.indexOf(slice);
 		if (index >= 0) slices.splice(index, 1);
 		
-		return child;
+		return slice;
 	}
 	
 	/**
-	 * Removes the DepthSprite from the position in the children list.
+	 * Removes the DepthSprite from the position in the slices list.
 	 * 
 	 * @param	Index	Index to remove.
 	 */
 	public function removeAt(Index:Int = 0):DepthSprite
 	{
-		if (children.length < Index || Index < 0) return null;
+		if (slices.length < Index || Index < 0) return null;
 		
-		return remove(children[Index]);
+		return remove_slice(slices[Index]);
 	}
 	
 	/**
-	 * Removes all children sprites from this sprite.
+	 * Removes all slices sprites from this sprite.
 	 */
 	public function removeAll():Void
 	{
-		for (child in children) remove(child);
+		for (slice in slices) remove_slice(slice);
 	}
-	
-	inline function preUpdate(elapsed:Float):Void 
-	{
-		#if FLX_DEBUG
-		FlxBasic.activeCount++;
-		#end
-		
-		last.set(x, y);
-		
-		for (child in children) if (child.active && child.exists) child.preUpdate(elapsed);
+
+	public function sync() {
+		for (slice in slices) if (slice.active && slice.exists) {
+			slice.x = slice.local_x + x;
+			slice.y = slice.local_y + y;
+			slice.z = slice.local_z * slice_offset + z;
+			slice.angle = slice.local_angle + angle;
+
+			slice.sync();
+		}
 	}
 
   override public function update(elapsed:Float) 
   {
-    preUpdate(elapsed);
+		super.update(elapsed);
 		
-		for (child in children) if (child.active && child.exists) child.update(elapsed);
-		
-		postUpdate(elapsed);
-    
+		for (slice in slices) if (slice.active && slice.exists) slice.update(elapsed);
+
+		sync();
+		    
     // if billboarded, angle is opposite of camera's
     if (billboard) angle = -FlxG.camera.angle;
-  }
-  /**
-   * Overriding this function provided by FlxNestedSprite to set this sprite's children's z variable
-   * @param elapsed 
-   */
-  public function postUpdate(elapsed:Float) {
-    if (moves)
-			updateMotion(elapsed);
-		
-		wasTouching = touching;
-		touching = FlxObject.NONE;
-		animation.update(elapsed);
-		
-		var delta:Float;
-		var velocityDelta:Float;
-		
-		velocityDelta = 0.5 * (FlxVelocity.computeVelocity(relativeAngularVelocity, relativeAngularAcceleration, angularDrag, maxAngular, elapsed) - relativeAngularVelocity);
-		relativeAngularVelocity += velocityDelta; 
-		relativeAngle += relativeAngularVelocity * elapsed;
-		relativeAngularVelocity += velocityDelta;
-		
-		velocityDelta = 0.5 * (FlxVelocity.computeVelocity(relativeVelocity.x, relativeAcceleration.x, drag.x, maxVelocity.x, elapsed) - relativeVelocity.x);
-		relativeVelocity.x += velocityDelta;
-		delta = relativeVelocity.x * elapsed;
-		relativeVelocity.x += velocityDelta;
-		relativeX += delta;
-		
-		velocityDelta = 0.5 * (FlxVelocity.computeVelocity(relativeVelocity.y, relativeAcceleration.y, drag.y, maxVelocity.y, elapsed) - relativeVelocity.y);
-		relativeVelocity.y += velocityDelta;
-		delta = relativeVelocity.y * elapsed;
-		relativeVelocity.y += velocityDelta;
-		relativeY += delta;
-		
-		for (child in children)
-		{
-			if (child.active && child.exists)
-			{
-				child.velocity.x = child.velocity.y = 0;
-				child.acceleration.x = child.acceleration.y = 0;
-				child.angularVelocity = child.angularAcceleration = 0;
-				child.postUpdate(elapsed);
-				
-				if (isSimpleRender(camera))
-				{
-					child.x = x + child.relativeX - offset.x;
-					child.y = y + child.relativeY - offset.y;
-				}
-				else
-				{
-					var radians:Float = angle * FlxAngle.TO_RAD;
-					var cos:Float = Math.cos(radians);
-					var sin:Float = Math.sin(radians);
-					
-					var dx = width / 2 - child.width / 2 - offset.x;
-					dx += scale.x * cos * (child.relativeX - width / 2 + child.width / 2) ;
-					dx -= scale.y * sin * (child.relativeY - height / 2 + child.height / 2) ;
-					
-					var dy = height / 2 - child.height / 2 - offset.y;
-					dy += scale.y * cos * (child.relativeY - height / 2 + child.height / 2);
-					dy += scale.x * sin * (child.relativeX - width / 2 + child.width / 2) ;					
-					
-					child.x = x +  dx;
-					child.y = y +  dy;
-				}
-				
-        child.z = z + child.relativeZ;
-				child.angle = angle + child.relativeAngle;
-				child.scale.x = scale.x * child.relativeScale.x;
-				child.scale.y = scale.y * child.relativeScale.y;
-				
-				child.velocity.x = velocity.x;
-				child.velocity.y = velocity.y;
-				child.acceleration.x = acceleration.x;
-				child.acceleration.y = acceleration.y;
-			}
-		}
-  }
+	}
+	
   /**
    * Extending `getScreenPosition` to set the sprite's z-offset based on the camera angle.
    * We do this here so as to not offset the sprite's actual world space, but just it's visuals.
@@ -292,10 +184,7 @@ class DepthSprite extends FlxSprite
 	{
 		super.draw();
 		
-		for (child in children)
-		{
-			if (child.exists && child.visible) child.draw();
-		}
+		for (slice in slices) if (slice.exists && slice.visible) slice.draw();
 	}
 	
 	#if FLX_DEBUG
@@ -303,10 +192,7 @@ class DepthSprite extends FlxSprite
 	{
 		super.drawDebug();
 		
-		for (child in children)
-		{
-			if (child.exists && child.visible) child.drawDebug();
-		}
+		for (slice in slices) if (slice.exists && slice.visible) slice.drawDebug();
 	}
 	#end
 
@@ -315,68 +201,76 @@ class DepthSprite extends FlxSprite
 		for (slice in slices) slice.kill();
 	}
 
+	override function revive() {
+		super.revive();
+		for (slice in slices) slice.revive();
+	}
+
+
   override function set_color(Color:FlxColor):FlxColor {
-    for (child in children) child.color = Color;
+    for (slice in slices) slice.color = Color;
     if (color == Color) return Color;
     color = Color;
     updateColorTransform();
     return color;
-  }
+	}
+	
+	public function set_slice_offsets(x:Float, y:Float) {
+		for (slice in slices) slice.offset.set(x, y);
+	}
+
   /**
    * Loads a 3D Sprite from a Sprite sheet
    * @param img 
+	 * @param width 
+   * @param height 
    * @param slices 
-   * @param slice_width 
-   * @param slice_height 
    */
-  public function loadSlices(img:FlxGraphicAsset, slices:Int, slice_width:Int, slice_height:Int):DepthSprite {
+  public function loadSlices(img:FlxGraphicAsset, width:Int, height:Int, slices:Int):DepthSprite {
     this.slices.resize(0);
     // loadGraphic(img, true, slice_width, slice_height);
-    makeGraphic(slice_width, slice_height, FlxColor.TRANSPARENT);
-    for (i in 0...slices) loadSlice(img, i, i, slice_width, slice_height);
+    makeGraphic(width, height, FlxColor.TRANSPARENT);
+    for (i in 0...slices) loadSlice(img, width, height, i, i);
 
     return this;
   }
   /**
    * Loads a 3D Sprite from a FlxColor
    * @param color 
+	 * @param width 
+   * @param height 
    * @param slices 
-   * @param slice_width 
-   * @param slice_height 
    */
-  public function makeSlices(color:FlxColor = FlxColor.WHITE, slices:Int, slice_width:Int, slice_height:Int):DepthSprite {    
+  public function makeSlices(width:Int, height:Int, slices:Int, color:FlxColor = FlxColor.WHITE):DepthSprite {    
     this.slices.resize(0);
     // makeGraphic(slice_width, slice_height, color);
-    makeGraphic(slice_width, slice_height, FlxColor.TRANSPARENT);
-    for (i in 0...slices + 1) makeSlice(color, i, slice_width, slice_height);
+    makeGraphic(width, height, FlxColor.TRANSPARENT);
+    for (i in 0...slices + 1) makeSlice(width, height, i, color);
 
     return this;
   }
 
-  inline function loadSlice(img:FlxGraphicAsset, z:Int, frame:Int = 0, width:Int, height:Int) {
+  inline function loadSlice(img:FlxGraphicAsset, width:Int, height:Int, z:Int, frame:Int = 0) {
     var s = getSlice(z);
     s.loadGraphic(img, true, width, height);
     s.animation.frameIndex = frame;
-    add(s);
   }
 
-  inline function makeSlice(color:FlxColor = FlxColor.WHITE, z:Int, width:Int, height:Int) {
+  inline function makeSlice(width:Int, height:Int, z:Int, color:FlxColor = FlxColor.WHITE) {
     var s = getSlice(z);
     s.makeGraphic(width, height, color);
-    add(s);
   }
 
   inline function getSlice(z:Int):DepthSprite {
-    var s:DepthSprite;
-    s = new DepthSprite(x, y);
-    s.relativeZ = -z * slice_offset;
-    s.z = this.z + s.relativeZ;
+    var s = new DepthSprite(x, y);
+    s.local_z = -z;
+    s.z = this.z + s.local_z;
     s.solid = false;
     s.camera = camera;
     #if FLX_DEBUG
     s.ignoreDrawDebug = true;
     #end
-    slices.push(s);
+    add_slice(s);
     return s;
   }
 
@@ -384,13 +278,9 @@ class DepthSprite extends FlxSprite
 		origin.set(frameWidth * 0.5, frameHeight);
 	}
 
-  public inline function set_children_visibility(value:Bool) {
-    for (child in children) child.visible = value;
-  }
+  inline function get_relative_rotation() return ((-rotation - FlxG.camera.angle + 180) % 360);
 
-  inline function get_relative_rotation() return ((-rotation - FlxG.camera.angle + 180) % 360); //.get_relative_degree();
-
-  inline function set_relative_rotation(value:Float) return rotation = ((value - FlxG.camera.angle) % 360); //.get_relative_degree();
+  inline function set_relative_rotation(value:Float) return rotation = ((value - FlxG.camera.angle) % 360);
 
 	var depth_pos:FlxVector = new FlxVector();
   /**
@@ -434,9 +324,7 @@ class DepthSprite extends FlxSprite
 		Alpha = FlxMath.bound(Alpha, 0, 1);
 		if (Alpha == alpha)
 			return alpha;
-		
-		alpha = Alpha * relativeAlpha;
-		
+				
 		if ((alpha != 1) || (color != 0x00ffffff))
 		{
 			var red:Float = (color >> 16) * _parentRed / 255;
@@ -469,25 +357,25 @@ class DepthSprite extends FlxSprite
 		}
 		dirty = true;
 		
-		if (children != null)
+		if (slices != null)
 		{
-			for (child in children)
-				child.alpha = alpha;
+			for (slice in slices)
+				slice.alpha = alpha;
 		}
 		
 		return alpha;
 	}
 
 	override function set_flipX(v:Bool) {
-		if (children != null) for (child in children) if (child.exists && child.active) child.flipX = v;
+		if (slices != null) for (slice in slices) if (slice.exists && slice.active) slice.flipX = v;
 		return super.set_flipX(v);
 	}
 	
 	override function set_facing(Direction:Int):Int
 	{
 		super.set_facing(Direction);
-		if (children != null) for (child in children)	{
-			if (child.exists && child.active) child.facing = Direction;
+		if (slices != null) for (slice in slices)	{
+			if (slice.exists && slice.active) slice.facing = Direction;
 		}
 		
 		return Direction;
@@ -500,6 +388,6 @@ class DepthSprite extends FlxSprite
 	
 	inline function get_count():Int 
 	{ 
-		return children.length; 
+		return slices.length; 
 	}
 }

@@ -1,4 +1,5 @@
 import { Room, Client } from "colyseus";
+
 import { GameState } from './Schema';
 import { Game } from './game';
 
@@ -9,14 +10,21 @@ export class GameRoom extends Room {
 
   onCreate (options:any) {
     this.setState(new GameState());
+
+    const w = this.state.world;
+    const map = this.game.generate_map(w.width, w.height, w.tile_width, w.tile_height);
+    for (let i = 0 ; i < map.length; i++) w.map.push(map[i]);
+
     this.setSimulationInterval((dt) => this.update(dt));
+    
     this.clock.setInterval(() => {
       this.game.check_fish(this.state);
     }, 3000);
   }
 
   onJoin (client:Client, options:any) {
-    this.state.createEntity(client.id, 0);
+    var entity = this.state.createEntity(client.id, 0);
+    this.game.place_entity(entity);
   }
 
   onMessage (client:Client, message:any) {

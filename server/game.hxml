@@ -1,5 +1,5 @@
 -cp ./
--cp ../schema
+-cp ../shared
 
 -lib colyseus
 -lib zerolib
@@ -8,6 +8,6 @@
 
 -debug
 
--js ../server/game.js
+-js ./game.js
 
 Game
