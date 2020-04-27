@@ -37,6 +37,27 @@ class Game {
             if (entity.rotation != angle) entity.rotation = angle;
           }
         case JustPressed:
+          if (entity.state == (cast PlayerState.Fishing) || entity.state == cast PlayerState.Casting) {
+            var bobber = state.entities[entity.child];
+            if (bobber != null) {
+              entity.state = cast PlayerState.Reeling;
+              bobber.target_x = entity.x;
+              bobber.target_y = entity.y;
+              bobber.state = cast BobberState.Reeling;
+              var fish = state.entities[bobber.child];
+              if (fish != null) {
+                if (fish.state == cast FishState.Nibbling) {
+                  entity.state = cast PlayerState.Caught;
+                  fish.state = cast FishState.Caught;
+                  fish.target_x = entity.x;
+                  fish.target_y = entity.y;
+                  fish.parent = entity.id;
+                }
+                else {}
+              }
+            }
+          }
+        case JustReleased:
           if (entity.state == cast PlayerState.Idle) {
             if (mouse.in_circle(pos, 16)) {
               entity.state = cast PlayerState.Aiming;
@@ -70,28 +91,7 @@ class Game {
               }
             }
           }
-          if (entity.state == (cast PlayerState.Fishing) || entity.state == cast PlayerState.Casting) {
-            var bobber = state.entities[entity.child];
-            if (bobber != null) {
-              entity.state = cast PlayerState.Reeling;
-              bobber.target_x = entity.x;
-              bobber.target_y = entity.y;
-              bobber.state = cast BobberState.Reeling;
-              var fish = state.entities[bobber.child];
-              if (fish != null) {
-                if (fish.state == cast FishState.Nibbling) {
-                  entity.state = cast PlayerState.Caught;
-                  fish.state = cast FishState.Caught;
-                  fish.target_x = entity.x;
-                  fish.target_y = entity.y;
-                  fish.parent = entity.id;
-                }
-                else {}
-              }
-            }
-          }
-        case JustReleased:
-          if (entity.state == cast PlayerState.Aiming) {
+          else if (entity.state == cast PlayerState.Aiming) {
             entity.rotation = mouse.rad_between(pos).rad_to_deg().to_int();
             var bobber = state.createEntity(Util.uuid(), cast EntityType.Bobber);
             bobber.x = entity.x;

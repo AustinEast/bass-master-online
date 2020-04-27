@@ -1,6 +1,7 @@
 package objects;
 
 class Fish extends BaseSprite {
+
   public function new(x, y) {
     super(x, y);
 

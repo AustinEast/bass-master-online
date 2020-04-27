@@ -107,8 +107,6 @@ class FishingState extends SubState
 		add(connecting);
 
 		new FlxTimer().start(1, (timer -> {
-			camera.setSize(FlxG.width * 2, FlxG.height * 2);
-			camera.setPosition(-FlxG.width.half(), -FlxG.height.half());
 			init_client();
 		}));
 	}
@@ -156,9 +154,9 @@ class FishingState extends SubState
 
 	function init_client() {
 		// #if debug
-		client = new Client('ws://localhost:2567');
+		// client = new Client('ws://localhost:2567');
 		// #else
-		// client = new Client('wss://fishing-alone-together.herokuapp.com');
+		client = new Client('wss://fishing-alone-together.herokuapp.com');
 		// #end
 
 		client.joinOrCreate("game_room", [], GameState, function(err, room) {
@@ -167,6 +165,8 @@ class FishingState extends SubState
 					FlxG.switchState(new BaseState());
 			}
 
+			camera.setSize(FlxG.width * 2, FlxG.height * 2);
+			camera.setPosition(-FlxG.width.half(), -FlxG.height.half());
 			connecting.kill();
 
 			var effect = new MosaicEffect();
@@ -351,7 +351,7 @@ class FishingState extends SubState
 
 		// The left mouse button has just been pressed
 		if (FlxG.mouse.justPressed) {
-			
+			FlxG.sound.play(Sounds.click_down__wav);
 			if (mouse_active) room.send({ mouse: cast JustPressed, x: mouse.x, y: mouse.y });
 			
 			if (aim_timer != null) aim_timer.cancel();
@@ -360,6 +360,7 @@ class FishingState extends SubState
 
 		// The left mouse button has just been released
 		if (FlxG.mouse.justReleased) {
+			FlxG.sound.play(Sounds.click_up__wav);
 			room.send({ mouse: cast JustReleased, x: mouse.x, y: mouse.y });
 			
 			if (aim_timer != null) aim_timer.cancel();

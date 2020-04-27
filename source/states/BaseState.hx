@@ -21,7 +21,11 @@ class BaseState extends State
 	{
 		super.create();
 
-		FlxG.sound.play(Sounds.startup__wav, 0.5);
+		FlxG.sound.play(Sounds.power_on__wav);
+		new FlxTimer().start(0.5, (timer) -> {
+			FlxG.sound.play(Sounds.startup__wav, 0.5);
+			FlxG.sound.playMusic(Music.hum__wav);
+		});
 
 		openSubState(new FadeIn());
 
@@ -36,7 +40,7 @@ class BaseState extends State
 		title.y = 240;
 
 		var start = new FlxBitmapText(byond);
-		start.text = 'click to connect';
+		start.text = 'click to join';
 		start.x = FlxG.width.half() - start.width.half();
 		start.y = 380;
 		start.scale.set(0.5,0.5);
@@ -66,8 +70,16 @@ class BaseState extends State
 		mouse.setPosition(FlxG.mouse.x, FlxG.mouse.y);
 
 		if (FlxG.mouse.justPressed) {
-			FlxG.sound.play(Sounds.click__mp3);
-			openSubState(new FadeOut(() -> FlxG.switchState(new FishingState()), 1.3));
+			FlxG.sound.play(Sounds.click_down__wav);
+		}
+
+		// The left mouse button has just been released
+		if (FlxG.mouse.justReleased) {
+			FlxG.sound.play(Sounds.click_up__wav);
+			openSubState(new FadeOut(() -> {
+				FlxG.sound.music.stop();
+				FlxG.switchState(new FishingState());
+			}, 1.3));
 		}
 	}
 }
