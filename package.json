@@ -1,8 +1,8 @@
 {
   "name": "alone-together-server",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "@colyseus/monitor": "^0.11.0",
