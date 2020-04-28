@@ -144,6 +144,7 @@ class DepthSprite extends FlxSprite
 			slice.y = slice.local_y + y;
 			slice.z = slice.local_z * slice_offset + z;
 			slice.angle = slice.local_angle + angle;
+			slice.scale.copyFrom(scale);
 
 			slice.sync();
 		}

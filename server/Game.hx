@@ -43,34 +43,9 @@ class Game {
               var angle = mouse.rad_between(pos).rad_to_deg().to_int() - 180;
 					    entity.rotation = angle;
             }
-            else {
-              entity.targets.length = 0;
-              var start = IntPoint.get((pos.x / state.world.tile_width).to_int(), (pos.y / state.world.tile_height).to_int());
-              var end = IntPoint.get((mouse.x / state.world.tile_width).to_int(), (mouse.y / state.world.tile_height).to_int());
-              var path = map.get_path({
-                start: start,
-                end: end,
-                passable: [1],
-                mode: DIAGONAL,
-                // simplify: LINE_OF_SIGHT_NO_DIAGONAL
-              });
-              if (path.length > 0) {
-                for (node in path) {
-                  var point = state.createPoint(node.x * state.world.tile_width + state.world.tile_width * 0.5, node.y * state.world.tile_height + state.world.tile_height * 0.5);
-                  entity.targets.push(point);
-                }
-
-                var node = entity.targets.shift();
-                entity.target_x = node.x;
-                entity.target_y = node.y;
-              }
-              else {
-                entity.target_x = mouse.x;
-                entity.target_y = mouse.y;
-              }
-            }
           }
-          if (entity.state == (cast PlayerState.Fishing) || entity.state == cast PlayerState.Casting) {
+          
+          else if (entity.state == (cast PlayerState.Fishing) || entity.state == cast PlayerState.Casting) {
             var bobber = state.entities[entity.child];
             if (bobber != null) {
               entity.state = cast PlayerState.Reeling;
@@ -91,7 +66,33 @@ class Game {
             }
           }
         case JustReleased:
-          if (entity.state == cast PlayerState.Aiming) {
+          if (entity.state == cast PlayerState.Idle) {
+            entity.targets.length = 0;
+            var start = IntPoint.get((pos.x / state.world.tile_width).to_int(), (pos.y / state.world.tile_height).to_int());
+            var end = IntPoint.get((mouse.x / state.world.tile_width).to_int(), (mouse.y / state.world.tile_height).to_int());
+            var path = map.get_path({
+              start: start,
+              end: end,
+              passable: [1],
+              mode: DIAGONAL,
+              // simplify: LINE_OF_SIGHT_NO_DIAGONAL
+            });
+            if (path.length > 0) {
+              for (node in path) {
+                var point = state.createPoint(node.x * state.world.tile_width + state.world.tile_width * 0.5, node.y * state.world.tile_height + state.world.tile_height * 0.5);
+                entity.targets.push(point);
+              }
+
+              var node = entity.targets.shift();
+              entity.target_x = node.x;
+              entity.target_y = node.y;
+            }
+            else {
+              entity.target_x = mouse.x;
+              entity.target_y = mouse.y;
+            }
+          }
+          else if (entity.state == cast PlayerState.Aiming) {
             entity.rotation = mouse.rad_between(pos).rad_to_deg().to_int();
             var bobber = state.createEntity(Util.uuid(), cast EntityType.Bobber);
             bobber.x = entity.x;
@@ -198,8 +199,17 @@ class Game {
 
           if (entity.state == cast BobberState.Idle) {
             if (move_entity_to_target(dt, entity, state)) {
-              entity.state = cast BobberState.Floating;
-              parent.state = cast PlayerState.Fishing;
+              var w = state.world;
+              if (entity.x > 0 && entity.x < w.width && entity.y < w.height && entity.y > 0 && map.get_xy((entity.x / w.tile_width).to_int(), (entity.y / w.tile_height).to_int()) == 1) {
+                entity.target_x = parent.x;
+                entity.target_y = parent.y;
+                entity.state = cast BobberState.Reeling;
+                parent.state = cast PlayerState.Reeling;
+              }
+              else {
+                entity.state = cast BobberState.Floating;
+                parent.state = cast PlayerState.Fishing;
+              }
             }
           }
 
@@ -228,7 +238,7 @@ class Game {
       fish.target_x = fish.x;
       fish.target_y = fish.y;
       fish.timer = 3 + Math.random() * 3;
-      fish.weight = 1 + (Math.random() * 4).to_int();
+      fish.weight = 1;
     }
   }
 
