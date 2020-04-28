@@ -373,27 +373,20 @@ class FishingState extends SubState
 		FlxMouseEventManager.add(back_button, null, (sprite) -> FlxG.switchState(new MenuState()));
 		back_button.camera = ui_cam;
 
-		// var shirt_button = new FlxSprite(30, 15).loadGraphic(Images.shirt_button__png);
-		// FlxMouseEventManager.add(shirt_button, null, (sprite) -> {
-		// 	if (room != null) {
-		// 		sprite = entities.get(room.sessionId);
-		// 		if (sprite != null) {
-
-		// 		}
-		// 	}
-		// });
-		// shirt_button.camera = ui_cam;
+		var shirt_button = new FlxSprite(30, 15).loadGraphic(Images.fullscreen_button__png);
+		FlxMouseEventManager.add(shirt_button, null, (sprite) -> FlxG.fullscreen = !FlxG.fullscreen);
+		shirt_button.camera = ui_cam;
 
 		ui_weight_text = new FlxText();
 		ui_weight_text.text = 'Total Caught: 0 Bass';
 		ui_weight_text.size = ui_weight_text.size * 2;
 		ui_weight_text.setBorderStyle(SHADOW, FlxColor.BLACK);
 		// ui_weight_text.centerOffsets(true);
-		ui_weight_text.setPosition(30, 10);
+		ui_weight_text.setPosition(50, 10);
 		ui_weight_text.camera = ui_cam;
 		
 		ui.add(back_button);
-		// ui.add(shirt_button);
+		ui.add(shirt_button);
 		ui.add(ui_weight_text);
 	}
 
