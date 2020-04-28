@@ -23,29 +23,8 @@ class Game {
 						entity.state = 1;
 						var angle = (Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0) - 180;
 						entity.rotation = angle;
-					} else {
-						entity.targets.length = 0;
-						var start = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(pos[0] / state.world.tile_width | 0,pos[1] / state.world.tile_height | 0);
-						var end = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(mouse[0] / state.world.tile_width | 0,mouse[1] / state.world.tile_height | 0);
-						var path = zero_utilities_AStar.get_path(this.map,{ start : start, end : end, passable : [1], mode : zero_utilities_EAStarMode.DIAGONAL});
-						if(path.length > 0) {
-							var _g = 0;
-							while(_g < path.length) {
-								var node = path[_g];
-								++_g;
-								var point = state.createPoint(node[0] * state.world.tile_width + state.world.tile_width * 0.5,node[1] * state.world.tile_height + state.world.tile_height * 0.5);
-								entity.targets.push(point);
-							}
-							var node1 = entity.targets.shift();
-							entity.target_x = node1.x;
-							entity.target_y = node1.y;
-						} else {
-							entity.target_x = mouse[0];
-							entity.target_y = mouse[1];
-						}
 					}
-				}
-				if(entity.state == 3 || entity.state == 2) {
+				} else if(entity.state == 3 || entity.state == 2) {
 					var bobber = state.entities[entity.child];
 					if(bobber != null) {
 						entity.state = 4;
@@ -66,7 +45,27 @@ class Game {
 				}
 				break;
 			case "jr":
-				if(entity.state == 1) {
+				if(entity.state == 0) {
+					entity.targets.length = 0;
+					var start = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(pos[0] / state.world.tile_width | 0,pos[1] / state.world.tile_height | 0);
+					var end = zero_utilities__$IntPoint_IntPoint_$Impl_$.get(mouse[0] / state.world.tile_width | 0,mouse[1] / state.world.tile_height | 0);
+					var path = zero_utilities_AStar.get_path(this.map,{ start : start, end : end, passable : [1], mode : zero_utilities_EAStarMode.DIAGONAL});
+					if(path.length > 0) {
+						var _g = 0;
+						while(_g < path.length) {
+							var node = path[_g];
+							++_g;
+							var point = state.createPoint(node[0] * state.world.tile_width + state.world.tile_width * 0.5,node[1] * state.world.tile_height + state.world.tile_height * 0.5);
+							entity.targets.push(point);
+						}
+						var node1 = entity.targets.shift();
+						entity.target_x = node1.x;
+						entity.target_y = node1.y;
+					} else {
+						entity.target_x = mouse[0];
+						entity.target_y = mouse[1];
+					}
+				} else if(entity.state == 1) {
 					entity.rotation = Math.atan2(pos[1] - mouse[1],pos[0] - mouse[0]) * (180 / Math.PI) | 0;
 					var bobber1 = state.createEntity(Util.uuid(),2);
 					bobber1.x = entity.x;
@@ -191,8 +190,16 @@ class Game {
 				}
 				if(entity.state == 0) {
 					if(_gthis.move_entity_to_target(dt,entity,state)) {
-						entity.state = 1;
-						parent1.state = 3;
+						var w = state.world;
+						if(entity.x > 0 && entity.x < w.width && entity.y < w.height && entity.y > 0 && zero_extensions_ArrayExt.get_xy(_gthis.map,entity.x / w.tile_width | 0,entity.y / w.tile_height | 0) == 1) {
+							entity.target_x = parent1.x;
+							entity.target_y = parent1.y;
+							entity.state = 3;
+							parent1.state = 4;
+						} else {
+							entity.state = 1;
+							parent1.state = 3;
+						}
 					}
 				} else if(entity.state == 3) {
 					if(_gthis.move_entity_to_target(dt,entity,state)) {
@@ -220,7 +227,7 @@ class Game {
 			fish.target_x = fish.x;
 			fish.target_y = fish.y;
 			fish.timer = 3 + Math.random() * 3;
-			fish.weight = 1 + (Math.random() * 4 | 0);
+			fish.weight = 1;
 		}
 	}
 	generate_map(width,height,tile_width,tile_height) {
@@ -677,8 +684,8 @@ class Util {
 				}
 			}
 		}
-		var tree_count = 10;
-		var rock_count = 10;
+		var tree_count = 15;
+		var rock_count = 15;
 		var _g41 = 0;
 		var _g51 = tree_count;
 		while(_g41 < _g51) {
@@ -4944,5 +4951,3 @@ zero_utilities__$Vec2_Vec2_$Impl_$.pool = [];
 zero_utilities__$Vec3_Vec3_$Impl_$.epsilon = 1e-8;
 zero_utilities__$Vec3_Vec3_$Impl_$.pool = [];
 })(typeof exports != "undefined" ? exports : typeof window != "undefined" ? window : typeof self != "undefined" ? self : this, {});
-
-//# sourceMappingURL=game.js.map
