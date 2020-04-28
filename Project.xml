@@ -28,6 +28,7 @@
 	<haxelib name="zerolib" />
 	<haxelib name="zerolib-flixel" />
 	<haxelib name="colyseus" />
+	<haxelib name="newgrounds" />
 
 	<!-- ______________________________ Haxedefines _____________________________ -->
 

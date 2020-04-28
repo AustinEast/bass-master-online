@@ -1,5 +1,7 @@
 package states;
 
+import io.newgrounds.objects.ScoreBoard;
+import io.newgrounds.NG;
 import flixel.input.mouse.FlxMouseEventManager;
 import flixel.FlxCamera;
 import flixel.graphics.frames.FlxBitmapFont;
@@ -68,6 +70,9 @@ class FishingState extends SubState
 	var last_mouse_x:Float;
 	var lerp:Float = 0.0015;
 
+	var total_score_board:ScoreBoard;
+	var previous_total_score:Int = 0;
+
 	override public function create():Void
 	{
 		super.create();
@@ -120,6 +125,18 @@ class FishingState extends SubState
 
 		FlxG.plugins.add(new FlxMouseEventManager());
 
+		if (NG.core.loggedIn) {
+			NG.core.requestScoreBoards(() -> {
+				total_score_board = NG.core.scoreBoards.get(9016);
+				if (total_score_board != null) {
+					total_score_board.requestScores(1, null, null, null, null, NG.core.user);
+					total_score_board.onUpdate.add(() -> {
+						previous_total_score = total_score_board.scores[0] == null ? 0 : total_score_board.scores[0].value;
+					});
+				}
+			});
+		}
+
 		new FlxTimer().start(1, (timer -> {
 			init_client();
 		}));
@@ -149,7 +166,9 @@ class FishingState extends SubState
 		if (player != null) {
 			if (!FlxG.mouse.pressed) camera.angle += ((-player.rotation - 90).translate_to_nearest_angle(camera.angle) - camera.angle) * lerp;
 
-			if (ui_weight_text != null) ui_weight_text.text = 'Total Caught: ${player.weight == null ? 0 : player.weight} Bass';
+			if (ui_weight_text != null) {
+				ui_weight_text.text = 'Total Caught: ${(player.weight == null ? 0 : player.weight) + previous_total_score} Bass';
+			}
 		}
 
 		canvas.endDraw();
@@ -205,7 +224,7 @@ class FishingState extends SubState
 			FlxG.sound.play(Music.forest__wav, 0.4, true);
 
 			room.state.entities.onAdd = (entity, key) -> {
-				trace("entity added at " + key + " => " + entity);
+				// trace("entity added at " + key + " => " + entity);
 				var pos = FlxPoint.get(entity.x, entity.y);
 
 				switch ((cast entity.type:EntityType)) {
@@ -241,7 +260,7 @@ class FishingState extends SubState
 
 				entity.onChange = (changes) -> {
 					// trace("entity changes => " + changes);
-					var is_player = entity.id == key;
+					var is_player = entity.id == room.sessionId;
 					switch (cast entity.type : EntityType) {
 						case Player:
 						for (change in changes) {
@@ -253,6 +272,11 @@ class FishingState extends SubState
 										FlxG.sound.play(Sounds.collected__wav, is_player ? 1 : .7); 
 									default:
 								}
+							}
+							if (is_player && change.field == 'weight' && total_score_board != null) {
+								var val = (cast change.value : Int) - (cast change.previousValue : Int);
+								if (val > 0)
+									total_score_board.postScore(val);
 							}
 						}
 						case Fish:
@@ -286,7 +310,7 @@ class FishingState extends SubState
 			room.onStateChange += process_state_change;
 	
 			room.state.entities.onRemove = (entity, key) -> {
-					trace("entity removed at " + key + " => " + entity);
+					// trace("entity removed at " + key + " => " + entity);
 						new FlxTimer().start(render_delay / 1000, (timer) -> {
 						var sprite = entities.get(key);
 						if (sprite != null) {
@@ -377,12 +401,25 @@ class FishingState extends SubState
 		FlxMouseEventManager.add(shirt_button, null, (sprite) -> FlxG.fullscreen = !FlxG.fullscreen);
 		shirt_button.camera = ui_cam;
 
+		var offset = 0.;
+
+		if (NG.core.loggedIn) {
+			var user_text = new FlxText();
+			user_text.text = 'User: ${NG.core.user.name}';
+			user_text.size = user_text.size * 2;
+			user_text.setBorderStyle(SHADOW, FlxColor.BLACK, 2);
+			user_text.setPosition(50, 10);
+			user_text.camera = ui_cam;
+			offset = user_text.height;
+			ui.add(user_text);
+		}
+
 		ui_weight_text = new FlxText();
 		ui_weight_text.text = 'Total Caught: 0 Bass';
 		ui_weight_text.size = ui_weight_text.size * 2;
-		ui_weight_text.setBorderStyle(SHADOW, FlxColor.BLACK);
+		ui_weight_text.setBorderStyle(SHADOW, FlxColor.BLACK, 2);
 		// ui_weight_text.centerOffsets(true);
-		ui_weight_text.setPosition(50, 10);
+		ui_weight_text.setPosition(50, 10 + offset);
 		ui_weight_text.camera = ui_cam;
 		
 		ui.add(back_button);
