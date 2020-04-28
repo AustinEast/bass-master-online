@@ -9,7 +9,7 @@ class Tree extends DepthSprite {
 
     var pos = FlxPoint.get(x, y);
 
-    slice_offset = 16.get_random(10);
+    slice_offset = 16.get_random(5);
     loadSlices(Images.tree_trunk__png, 128, 128, 11);
     // centerOrigin();
     this.make_and_center_hitbox(27, 27);

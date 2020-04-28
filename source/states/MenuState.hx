@@ -10,7 +10,7 @@ import states.FishingState;
 
 using flixel.util.FlxSpriteUtil;
 
-class BaseState extends State
+class MenuState extends State
 {
 
 	var ubble:FlxBitmapFont;
@@ -20,6 +20,8 @@ class BaseState extends State
 	override public function create()
 	{
 		super.create();
+
+		camera.bgColor = 0xff361027;
 
 		FlxG.sound.play(Sounds.power_on__wav);
 		new FlxTimer().start(0.5, (timer) -> {
@@ -46,6 +48,7 @@ class BaseState extends State
 		start.scale.set(0.5,0.5);
 		start.flicker(0, 0.8);
 		
+		FlxG.mouse.visible = false;
 		mouse = new FlxSprite().loadGraphic(Images.mouse__png);
 		mouse.scale.set(3, 3);
 

@@ -13,6 +13,6 @@ class ClickState extends FlxState {
     {
       super.update(dt);
   
-      if (FlxG.mouse.justPressed)  camera.fade(FlxColor.BLACK, 1, false, () -> new FlxTimer().start(1, (timer) -> FlxG.switchState(new BaseState()), 1));
+      if (FlxG.mouse.justPressed)  camera.fade(FlxColor.BLACK, 1, false, () -> new FlxTimer().start(1, (timer) -> FlxG.switchState(new MenuState()), 1));
     }
 }

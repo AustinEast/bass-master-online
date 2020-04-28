@@ -95,8 +95,8 @@ class Util {
       map.set_circle(ran_x , ran_y, ran_r, 0);
     }
 
-    var tree_count = 10;
-    var rock_count = 10;
+    var tree_count = 15;
+    var rock_count = 15;
     
     // Generate Trees
 		for (i in 0...tree_count) {

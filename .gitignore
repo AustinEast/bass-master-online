@@ -4,3 +4,5 @@ debug/
 node_modules/
 server/server.js
 schema/schema
+server/game.js
+server/game.js.map
