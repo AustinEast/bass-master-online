@@ -19,7 +19,7 @@ The Server is made up of two parts:
 
 You may be wondering what the motivation was behind writing the Game logic in Haxe, even though its output is run on a server by a Typescript-based Node app. Normally it would be simpler to write it all in Typescript, but there are a couple of advantages to doing it this way:
 
-1) It allows the Game instance running on the Server to easiy share Types and Utility methods with the Client app (which is built with Haxeflixel, a Haxe-based Game Framework). Check out the `./share` directory the see what I mean.
+1) It allows the Game instance running on the Server to easiy share Types and Utility methods with the Client app (which is built with Haxeflixel, a Haxe-based Game Framework). Check out the `shared` directory the see what I mean.
 2) It gives access to the Haxe ecosystem, which includes its awesome standard library along with other great game-oriented libraries ([zerolib](https://github.com/01010111/zerolib) in this case)!
 3) It's more fun to write code in Haxe!
 
