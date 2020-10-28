@@ -1,24 +1,26 @@
 package states;
+import openfl.filters.ShaderFilter;
 
-import io.newgrounds.objects.ScoreBoard;
-import io.newgrounds.NG;
 import flixel.input.mouse.FlxMouseEventManager;
 import flixel.FlxCamera;
 import flixel.graphics.frames.FlxBitmapFont;
 import flixel.text.FlxBitmapText;
-import zero.flixel.states.sub.FadeIn;
-import openfl.filters.ShaderFilter;
+import flixel.text.FlxText;
+import flixel.util.FlxTimer;
+import flixel.math.FlxMath;
 import util.MosaicEffect;
+import util.ParticleEmitter;
 import zero.utilities.Vec2;
 import objects.*;
 import schema.GameState;
 import zero.flixel.states.sub.SubState;
-import flixel.text.FlxText;
-import flixel.util.FlxTimer;
-import flixel.math.FlxMath;
+import zero.flixel.states.sub.FadeIn;
+
 
 import io.colyseus.Client;
 import io.colyseus.Room;
+import io.newgrounds.objects.ScoreBoard;
+import io.newgrounds.NG;
 
 using flixel.util.FlxSpriteUtil;
 
@@ -54,10 +56,11 @@ class FishingState extends SubState
 	var rocks:Array<Rock> = [];
 
 	var shadows:FlxGroup;
+	var ripples:ParticleEmitter;
 	var sorted:FlxTypedGroup<DepthSprite>;
 	var players:FlxTypedGroup<Player>;
 	var fish:FlxTypedGroup<Fish>;
-	var fish_on_top:FlxTypedGroup<Fish>;
+	var poofs:ParticleEmitter;
 	var bobbers:FlxTypedGroup<Bobber>;
 	var canvas:FlxSprite;
 	var tilemap:DepthTilemap;
@@ -82,10 +85,11 @@ class FishingState extends SubState
 		openSubState(new FadeIn());
 
 		shadows = new FlxGroup();
+		ripples = new ParticleEmitter(() -> new Ripple());
 		sorted = new FlxTypedGroup();
 		players = new FlxTypedGroup();
 		fish = new FlxTypedGroup();
-		fish_on_top = new FlxTypedGroup();
+		poofs = new ParticleEmitter(() -> new Poof());
 		bobbers = new FlxTypedGroup();
 
 		ui = new FlxGroup();
@@ -103,7 +107,9 @@ class FishingState extends SubState
 		add(tilemap);
 		add(shadows);
 		add(canvas);
+		add(ripples);
 		add(sorted);
+		add(poofs);
 		// add(fish);
 		// add(bobbers);
 		// add(players);
@@ -273,10 +279,17 @@ class FishingState extends SubState
 									default:
 								}
 							}
-							if (is_player && change.field == 'weight' && total_score_board != null) {
-								var val = (cast change.value : Int) - (cast change.previousValue : Int);
-								if (val > 0)
-									total_score_board.postScore(val);
+							if (is_player && change.field == 'weight') {
+
+								// Medals
+								ng_medal_check(change.value);
+
+								// ScoreBoards
+								if (total_score_board != null) {
+									var val = (cast change.value : Int) - (cast change.previousValue : Int);
+									if (val > 0)
+										total_score_board.postScore(val);
+								}
 							}
 						}
 						case Fish:
@@ -285,6 +298,17 @@ class FishingState extends SubState
 									switch (cast change.value : FishState) {
 										case Nibbling:
 											FlxG.sound.play(Sounds.hooked__wav, 1.get_random(0.6)); 
+											var pos = FlxPoint.get(entity.target_x, entity.target_y);
+											ripples.fire({position: pos});
+											pos.put();
+											for (i in 0...3) {
+													var pos = FlxPoint.get(entity.target_x + Main.random.float(-2, 2), entity.target_y + Main.random.float(-2, 2));
+													poofs.fire({
+													position: pos,
+													animation: '${Main.random.int(13, 15)}',
+												});
+												pos.put();
+											}
 										default:
 									}
 								}
@@ -640,5 +664,41 @@ class FishingState extends SubState
     canvas.drawCircle(v1.x, v1.y, 4);
     canvas.drawCircle(v2.x, v2.y, 4);
 		canvas.draw_dashed_line(v1, v2, (v1.distance(v2).abs()/6).int(), color);
+	}
+
+	function ng_medal_check(weight:Int) {
+		final novice_id = 59382;
+		final enthusiast_id = 59384;
+		final master_id = 59385;
+
+		var val = weight + previous_total_score;
+
+		if (NG.core.loggedIn) {
+			if (NG.core.medals == null) {
+				NG.core.requestMedals(() -> {
+					ng_medal_check(weight);
+				});
+			}
+			else {
+				if (val >= 10) {
+					var novice = NG.core.medals.get(novice_id);
+					if (novice != null && !novice.unlocked) {
+						novice.sendUnlock();
+					}
+				}
+				if (val >= 50) {
+					var enthusiast = NG.core.medals.get(enthusiast_id);
+					if (enthusiast != null && !enthusiast.unlocked) {
+						enthusiast.sendUnlock();
+					}
+				}
+				if (val >= 100) {
+					var master = NG.core.medals.get(master_id);
+					if (master != null && !master.unlocked) {
+						master.sendUnlock();
+					}
+				}
+			}
+		}
 	}
 }

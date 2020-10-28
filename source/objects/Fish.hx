@@ -11,6 +11,6 @@ class Fish extends BaseSprite {
     animation.play("wiggle");
     centerOrigin();
     
-    z = - 2;
+    z = - 3;
   }
 }
