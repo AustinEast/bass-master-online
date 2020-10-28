@@ -1,12 +1,11 @@
 {
-  "name": "my-app",
+  "name": "bass-master-online-server",
   "version": "1.0.0",
-  "description": "npm init template for bootstraping an empty Colyseus project",
+  "description": "The Colyseus server for Bass Master Online",
   "main": "lib/index.js",
   "scripts": {
     "start": "ts-node index.ts",
     "schema": "schema-codegen ./Schema.ts --output ../shared/schema/ --haxe --namespace schema",
-    "loadtest": "colyseus-loadtest loadtest/example.ts --room my_room --numClients 2",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
