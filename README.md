@@ -1,11 +1,15 @@
 # Getting Started
 
-TODO
+This project requires [Haxe](https://haxe.org), [Haxeflixel](https://haxeflixel.com), and [Node](https://nodejs.org) to be installed.
 
+First, Clone the Repo:
 ```
-git clone repo.git
+git clone https://github.com/AustinEast/bass-master-online.git
 ```
-
+Then direct your terminal to the newly cloned directory, and install all the Haxe Dependencies:
+```
+openfl install
+```
 ## Server
 
 The Server is made up of two parts:
@@ -31,9 +35,8 @@ Install the Node dependencies, then build the Colyseus Schema:
 npm i
 npm run schema
 ```
-Install the Haxe dependencies, then compile the Haxe code:
+Compile the Haxe code:
 ```
-haxelib install all
 haxe game.hxml
 ```
 Start the Server:
