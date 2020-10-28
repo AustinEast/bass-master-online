@@ -27,7 +27,7 @@
 	<haxelib name="flixel-addons" />
 	<haxelib name="zerolib" />
 	<haxelib name="zerolib-flixel" />
-	<haxelib name="colyseus" />
+	<haxelib name="colyseus" version="0.12.5" />
 	<haxelib name="newgrounds" />
 
 	<!-- ______________________________ Haxedefines _____________________________ -->
