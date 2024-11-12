@@ -1,7 +1,7 @@
 package states;
+import flixel.input.mouse.FlxMouseEvent;
 import openfl.filters.ShaderFilter;
 
-import flixel.input.mouse.FlxMouseEventManager;
 import flixel.FlxCamera;
 import flixel.graphics.frames.FlxBitmapFont;
 import flixel.text.FlxBitmapText;
@@ -129,10 +129,8 @@ class FishingState extends SubState
 
 		add(connecting);
 
-		FlxG.plugins.add(new FlxMouseEventManager());
-
 		if (NG.core.loggedIn) {
-			NG.core.requestScoreBoards(() -> {
+			NG.core.scoreBoards.loadList((err) -> {
 				total_score_board = NG.core.scoreBoards.get(9016);
 				if (total_score_board != null) {
 					total_score_board.requestScores(1, null, null, null, null, NG.core.user);
@@ -215,13 +213,13 @@ class FishingState extends SubState
 			connecting.kill();
 
 			var effect = new MosaicEffect();
-			camera.setFilters([new ShaderFilter(cast effect.shader)]);
+			camera.filters = [new ShaderFilter(cast effect.shader)];
 
 			var effect_tween = FlxTween.num(15, 1, 1, null, (v) -> {
 				effect.setStrength(v, v);
 			});
 			effect_tween.onComplete = (tween) -> {
-				camera.setFilters([]);
+				camera.filters = [];
 			}
 
 			var world = room.state.world;
@@ -414,15 +412,28 @@ class FishingState extends SubState
 		ui_cam = new FlxCamera();
 		ui_cam.bgColor = FlxColor.TRANSPARENT;
 		ui.camera = ui_cam;
-		FlxCamera.defaultCameras = [FlxG.camera];
 		FlxG.cameras.add(ui_cam);
+		FlxG.cameras.setDefaultDrawTarget(ui_cam, false);
+
 
 		var back_button = new FlxSprite(10, 15).loadGraphic(Images.back_button__png);
-		FlxMouseEventManager.add(back_button, null, (sprite) -> FlxG.switchState(new MenuState()));
+		back_button.color = 0xFFCBCBCB;
+		FlxMouseEvent.add(back_button, 
+			(sprite) -> sprite.color = FlxColor.GRAY, 
+			(sprite) -> FlxG.switchState(new MenuState()),
+			(sprite) -> sprite.color = FlxColor.WHITE,
+			(sprite) -> sprite.color = 0xFFA6A6A6
+ 			);
 		back_button.camera = ui_cam;
 
 		var shirt_button = new FlxSprite(30, 15).loadGraphic(Images.fullscreen_button__png);
-		FlxMouseEventManager.add(shirt_button, null, (sprite) -> FlxG.fullscreen = !FlxG.fullscreen);
+		shirt_button.color = 0xFFCBCBCB;
+		FlxMouseEvent.add(shirt_button,
+			(sprite) -> sprite.color = FlxColor.GRAY,
+			(sprite) -> FlxG.fullscreen = !FlxG.fullscreen,
+			(sprite) -> sprite.color = FlxColor.WHITE,
+			(sprite) -> sprite.color = 0xFFA6A6A6
+			);
 		shirt_button.camera = ui_cam;
 
 		var offset = 0.;
@@ -473,7 +484,7 @@ class FishingState extends SubState
 
 		var mouse = FlxG.mouse.getWorldPosition();
 		var p = FlxPoint.get(camera.scroll.x + camera.width.half(), camera.scroll.y + camera.height.half());
-		mouse.rotate(p, -camera.angle);
+		mouse.pivotDegrees(p, -camera.angle);
 		p.put();
 
 		cursor.set_midpoint_position(mouse);
@@ -675,7 +686,7 @@ class FishingState extends SubState
 
 		if (NG.core.loggedIn) {
 			if (NG.core.medals == null) {
-				NG.core.requestMedals(() -> {
+				NG.core.requestMedals((err) -> {
 					ng_medal_check(weight);
 				});
 			}

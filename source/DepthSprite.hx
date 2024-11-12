@@ -288,7 +288,7 @@ class DepthSprite extends FlxSprite
 
   inline function set_relative_rotation(value:Float) return rotation = ((value - FlxG.camera.angle) % 360);
 
-	var depth_pos:FlxVector = new FlxVector();
+	var depth_pos:FlxPoint = new FlxPoint();
   /**
    *  Function inspired by @01010111
    */

@@ -19,10 +19,10 @@ class Main extends Sprite
 		NG.createAndCheckSession("50297:xUhNXYLw", Util.uuid());
 
 		#if debug
-		addChild(new FlxGame(0, 0, ClickState, 1, 60, 60, true));
+		addChild(new FlxGame(0, 0, ClickState, 60, 60, true));
 		// addChild(new FPS());
 		#else
-		addChild(new FlxGame(0, 0, ClickState, 1, 60, 60, false));
+		addChild(new FlxGame(0, 0, ClickState, 60, 60, false));
 		#end
 		
 		FlxG.autoPause = false;
