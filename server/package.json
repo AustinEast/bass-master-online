@@ -6,6 +6,8 @@
   "scripts": {
     "start": "ts-node index.ts",
     "schema": "schema-codegen ./Schema.ts --output ../shared/schema/ --haxe --namespace schema",
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
