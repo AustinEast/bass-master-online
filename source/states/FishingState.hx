@@ -1,22 +1,26 @@
 package states;
+import flixel.input.mouse.FlxMouseEvent;
+import openfl.filters.ShaderFilter;
 
-import flixel.input.mouse.FlxMouseEventManager;
 import flixel.FlxCamera;
 import flixel.graphics.frames.FlxBitmapFont;
 import flixel.text.FlxBitmapText;
-import zero.flixel.states.sub.FadeIn;
-import openfl.filters.ShaderFilter;
+import flixel.text.FlxText;
+import flixel.util.FlxTimer;
+import flixel.math.FlxMath;
 import util.MosaicEffect;
+import util.ParticleEmitter;
 import zero.utilities.Vec2;
 import objects.*;
 import schema.GameState;
 import zero.flixel.states.sub.SubState;
-import flixel.text.FlxText;
-import flixel.util.FlxTimer;
-import flixel.math.FlxMath;
+import zero.flixel.states.sub.FadeIn;
+
 
 import io.colyseus.Client;
 import io.colyseus.Room;
+import io.newgrounds.objects.ScoreBoard;
+import io.newgrounds.NG;
 
 using flixel.util.FlxSpriteUtil;
 
@@ -52,10 +56,11 @@ class FishingState extends SubState
 	var rocks:Array<Rock> = [];
 
 	var shadows:FlxGroup;
+	var ripples:ParticleEmitter;
 	var sorted:FlxTypedGroup<DepthSprite>;
 	var players:FlxTypedGroup<Player>;
 	var fish:FlxTypedGroup<Fish>;
-	var fish_on_top:FlxTypedGroup<Fish>;
+	var poofs:ParticleEmitter;
 	var bobbers:FlxTypedGroup<Bobber>;
 	var canvas:FlxSprite;
 	var tilemap:DepthTilemap;
@@ -68,6 +73,9 @@ class FishingState extends SubState
 	var last_mouse_x:Float;
 	var lerp:Float = 0.0015;
 
+	var total_score_board:ScoreBoard;
+	var previous_total_score:Int = 0;
+
 	override public function create():Void
 	{
 		super.create();
@@ -77,10 +85,11 @@ class FishingState extends SubState
 		openSubState(new FadeIn());
 
 		shadows = new FlxGroup();
+		ripples = new ParticleEmitter(() -> new Ripple());
 		sorted = new FlxTypedGroup();
 		players = new FlxTypedGroup();
 		fish = new FlxTypedGroup();
-		fish_on_top = new FlxTypedGroup();
+		poofs = new ParticleEmitter(() -> new Poof());
 		bobbers = new FlxTypedGroup();
 
 		ui = new FlxGroup();
@@ -98,7 +107,9 @@ class FishingState extends SubState
 		add(tilemap);
 		add(shadows);
 		add(canvas);
+		add(ripples);
 		add(sorted);
+		add(poofs);
 		// add(fish);
 		// add(bobbers);
 		// add(players);
@@ -118,7 +129,17 @@ class FishingState extends SubState
 
 		add(connecting);
 
-		FlxG.plugins.add(new FlxMouseEventManager());
+		if (NG.core.loggedIn) {
+			NG.core.scoreBoards.loadList((err) -> {
+				total_score_board = NG.core.scoreBoards.get(9016);
+				if (total_score_board != null) {
+					total_score_board.requestScores(1, null, null, null, null, NG.core.user);
+					total_score_board.onUpdate.add(() -> {
+						previous_total_score = total_score_board.scores[0] == null ? 0 : total_score_board.scores[0].value;
+					});
+				}
+			});
+		}
 
 		new FlxTimer().start(1, (timer -> {
 			init_client();
@@ -149,7 +170,9 @@ class FishingState extends SubState
 		if (player != null) {
 			if (!FlxG.mouse.pressed) camera.angle += ((-player.rotation - 90).translate_to_nearest_angle(camera.angle) - camera.angle) * lerp;
 
-			if (ui_weight_text != null) ui_weight_text.text = 'Total Caught: ${player.weight == null ? 0 : player.weight} Bass';
+			if (ui_weight_text != null) {
+				ui_weight_text.text = 'Total Caught: ${(player.weight == null ? 0 : player.weight) + previous_total_score} Bass';
+			}
 		}
 
 		canvas.endDraw();
@@ -190,13 +213,13 @@ class FishingState extends SubState
 			connecting.kill();
 
 			var effect = new MosaicEffect();
-			camera.setFilters([new ShaderFilter(cast effect.shader)]);
+			camera.filters = [new ShaderFilter(cast effect.shader)];
 
 			var effect_tween = FlxTween.num(15, 1, 1, null, (v) -> {
 				effect.setStrength(v, v);
 			});
 			effect_tween.onComplete = (tween) -> {
-				camera.setFilters([]);
+				camera.filters = [];
 			}
 
 			var world = room.state.world;
@@ -205,7 +228,7 @@ class FishingState extends SubState
 			FlxG.sound.play(Music.forest__wav, 0.4, true);
 
 			room.state.entities.onAdd = (entity, key) -> {
-				trace("entity added at " + key + " => " + entity);
+				// trace("entity added at " + key + " => " + entity);
 				var pos = FlxPoint.get(entity.x, entity.y);
 
 				switch ((cast entity.type:EntityType)) {
@@ -241,7 +264,7 @@ class FishingState extends SubState
 
 				entity.onChange = (changes) -> {
 					// trace("entity changes => " + changes);
-					var is_player = entity.id == key;
+					var is_player = entity.id == room.sessionId;
 					switch (cast entity.type : EntityType) {
 						case Player:
 						for (change in changes) {
@@ -254,6 +277,18 @@ class FishingState extends SubState
 									default:
 								}
 							}
+							if (is_player && change.field == 'weight') {
+
+								// Medals
+								ng_medal_check(change.value);
+
+								// ScoreBoards
+								if (total_score_board != null) {
+									var val = (cast change.value : Int) - (cast change.previousValue : Int);
+									if (val > 0)
+										total_score_board.postScore(val);
+								}
+							}
 						}
 						case Fish:
 							for (change in changes) {
@@ -261,6 +296,17 @@ class FishingState extends SubState
 									switch (cast change.value : FishState) {
 										case Nibbling:
 											FlxG.sound.play(Sounds.hooked__wav, 1.get_random(0.6)); 
+											var pos = FlxPoint.get(entity.target_x, entity.target_y);
+											ripples.fire({position: pos});
+											pos.put();
+											for (i in 0...3) {
+													var pos = FlxPoint.get(entity.target_x + Main.random.float(-2, 2), entity.target_y + Main.random.float(-2, 2));
+													poofs.fire({
+													position: pos,
+													animation: '${Main.random.int(13, 15)}',
+												});
+												pos.put();
+											}
 										default:
 									}
 								}
@@ -286,7 +332,7 @@ class FishingState extends SubState
 			room.onStateChange += process_state_change;
 	
 			room.state.entities.onRemove = (entity, key) -> {
-					trace("entity removed at " + key + " => " + entity);
+					// trace("entity removed at " + key + " => " + entity);
 						new FlxTimer().start(render_delay / 1000, (timer) -> {
 						var sprite = entities.get(key);
 						if (sprite != null) {
@@ -366,23 +412,49 @@ class FishingState extends SubState
 		ui_cam = new FlxCamera();
 		ui_cam.bgColor = FlxColor.TRANSPARENT;
 		ui.camera = ui_cam;
-		FlxCamera.defaultCameras = [FlxG.camera];
 		FlxG.cameras.add(ui_cam);
+		FlxG.cameras.setDefaultDrawTarget(ui_cam, false);
+
 
 		var back_button = new FlxSprite(10, 15).loadGraphic(Images.back_button__png);
-		FlxMouseEventManager.add(back_button, null, (sprite) -> FlxG.switchState(new MenuState()));
+		back_button.color = 0xFFCBCBCB;
+		FlxMouseEvent.add(back_button, 
+			(sprite) -> sprite.color = FlxColor.GRAY, 
+			(sprite) -> FlxG.switchState(new MenuState()),
+			(sprite) -> sprite.color = FlxColor.WHITE,
+			(sprite) -> sprite.color = 0xFFA6A6A6
+ 			);
 		back_button.camera = ui_cam;
 
 		var shirt_button = new FlxSprite(30, 15).loadGraphic(Images.fullscreen_button__png);
-		FlxMouseEventManager.add(shirt_button, null, (sprite) -> FlxG.fullscreen = !FlxG.fullscreen);
+		shirt_button.color = 0xFFCBCBCB;
+		FlxMouseEvent.add(shirt_button,
+			(sprite) -> sprite.color = FlxColor.GRAY,
+			(sprite) -> FlxG.fullscreen = !FlxG.fullscreen,
+			(sprite) -> sprite.color = FlxColor.WHITE,
+			(sprite) -> sprite.color = 0xFFA6A6A6
+			);
 		shirt_button.camera = ui_cam;
+
+		var offset = 0.;
+
+		if (NG.core.loggedIn) {
+			var user_text = new FlxText();
+			user_text.text = 'User: ${NG.core.user.name}';
+			user_text.size = user_text.size * 2;
+			user_text.setBorderStyle(SHADOW, FlxColor.BLACK, 2);
+			user_text.setPosition(50, 10);
+			user_text.camera = ui_cam;
+			offset = user_text.height;
+			ui.add(user_text);
+		}
 
 		ui_weight_text = new FlxText();
 		ui_weight_text.text = 'Total Caught: 0 Bass';
 		ui_weight_text.size = ui_weight_text.size * 2;
-		ui_weight_text.setBorderStyle(SHADOW, FlxColor.BLACK);
+		ui_weight_text.setBorderStyle(SHADOW, FlxColor.BLACK, 2);
 		// ui_weight_text.centerOffsets(true);
-		ui_weight_text.setPosition(50, 10);
+		ui_weight_text.setPosition(50, 10 + offset);
 		ui_weight_text.camera = ui_cam;
 		
 		ui.add(back_button);
@@ -412,7 +484,7 @@ class FishingState extends SubState
 
 		var mouse = FlxG.mouse.getWorldPosition();
 		var p = FlxPoint.get(camera.scroll.x + camera.width.half(), camera.scroll.y + camera.height.half());
-		mouse.rotate(p, -camera.angle);
+		mouse.pivotDegrees(p, -camera.angle);
 		p.put();
 
 		cursor.set_midpoint_position(mouse);
@@ -603,5 +675,41 @@ class FishingState extends SubState
     canvas.drawCircle(v1.x, v1.y, 4);
     canvas.drawCircle(v2.x, v2.y, 4);
 		canvas.draw_dashed_line(v1, v2, (v1.distance(v2).abs()/6).int(), color);
+	}
+
+	function ng_medal_check(weight:Int) {
+		final novice_id = 59382;
+		final enthusiast_id = 59384;
+		final master_id = 59385;
+
+		var val = weight + previous_total_score;
+
+		if (NG.core.loggedIn) {
+			if (NG.core.medals == null) {
+				NG.core.requestMedals((err) -> {
+					ng_medal_check(weight);
+				});
+			}
+			else {
+				if (val >= 10) {
+					var novice = NG.core.medals.get(novice_id);
+					if (novice != null && !novice.unlocked) {
+						novice.sendUnlock();
+					}
+				}
+				if (val >= 50) {
+					var enthusiast = NG.core.medals.get(enthusiast_id);
+					if (enthusiast != null && !enthusiast.unlocked) {
+						enthusiast.sendUnlock();
+					}
+				}
+				if (val >= 100) {
+					var master = NG.core.medals.get(master_id);
+					if (master != null && !master.unlocked) {
+						master.sendUnlock();
+					}
+				}
+			}
+		}
 	}
 }

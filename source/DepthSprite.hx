@@ -44,6 +44,8 @@ class DepthSprite extends FlxSprite
 	public var local_z:Float;
 
 	public var local_angle:Float;
+
+	public var velocity_z:Float;
   /**
    * Used to set whether the Sprite "billboards",
    * or that the Sprite's angle will always remain opposite of the Camera's
@@ -65,7 +67,8 @@ class DepthSprite extends FlxSprite
   public function new(x:Float = 0, y:Float = 0) {
     super(x, y);
     z = 0;
-    rotation = 0;
+		rotation = 0;
+		velocity_z = 0;
   }
   /**
 	 * WARNING: This will remove this sprite entirely. Use kill() if you 
@@ -153,6 +156,8 @@ class DepthSprite extends FlxSprite
   override public function update(elapsed:Float) 
   {
 		super.update(elapsed);
+
+		z += velocity_z * elapsed;
 		
 		for (slice in slices) if (slice.active && slice.exists) slice.update(elapsed);
 
@@ -283,7 +288,7 @@ class DepthSprite extends FlxSprite
 
   inline function set_relative_rotation(value:Float) return rotation = ((value - FlxG.camera.angle) % 360);
 
-	var depth_pos:FlxVector = new FlxVector();
+	var depth_pos:FlxPoint = new FlxPoint();
   /**
    *  Function inspired by @01010111
    */

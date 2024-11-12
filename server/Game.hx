@@ -38,7 +38,7 @@ class Game {
           }
         case JustPressed:
           if (entity.state == cast PlayerState.Idle) {
-            if (mouse.in_circle(pos, 16)) {
+            if (mouse.in_circle(pos.x, pos.y, 16)) {
               entity.state = cast PlayerState.Aiming;
               var angle = mouse.rad_between(pos).rad_to_deg().to_int() - 180;
 					    entity.rotation = angle;
@@ -276,7 +276,7 @@ class Game {
     var entity_pos = Vec2.get(entity.x, entity.y);
     var target_pos = Vec2.get(entity.target_x, entity.target_y);
     
-    if (entity_pos.equals(target_pos) && entity.targets.length == 0) {
+    if (entity_pos == target_pos && entity.targets.length == 0) {
       entity_pos.put();
       target_pos.put();
       return true;
