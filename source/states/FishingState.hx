@@ -197,7 +197,7 @@ class FishingState extends SubState
 		#if debug
 		client = new Client('ws://localhost:2567');
 		#else
-		client = new Client('wss://fishing-alone-together.herokuapp.com');
+		client = new Client('wss://fishing-alone-together-6f60f8a68f68.herokuapp.com');
 		#end
 
 		client.joinOrCreate("game_room", [], GameState, function(err, room) {
